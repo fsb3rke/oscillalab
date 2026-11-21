@@ -430,12 +430,12 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   standBase.castShadow = true;
   standBase.receiveShadow = true;
 
-  const mainColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.35, 24), chromeMat);
-  mainColumn.position.set(-1.1, 0.5, -0.35);
+  const mainColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.6, 24), chromeMat);
+  mainColumn.position.set(-1.1, 0.62, -0.35);
   mainColumn.castShadow = true;
 
   const topBracket = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.14, 0.24), castIronMat);
-  topBracket.position.set(-0.45, 2.08, -0.35);
+  topBracket.position.set(-0.45, 2.32, -0.35);
   topBracket.castShadow = true;
 
   const vRulerTex = createRulerTexture(true);
@@ -443,16 +443,16 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     new THREE.BoxGeometry(0.26, 2.05, 0.03),
     new THREE.MeshStandardMaterial({ map: vRulerTex, roughness: 0.35, metalness: 0.1 })
   );
-  scaleBoard.position.set(-0.72, -0.05, -0.25);
+  scaleBoard.position.set(-0.72, 0.22, -0.25);
   scene.add(standBase, mainColumn, topBracket, scaleBoard);
 
   // Üst Sinüzoidal Tahrik Ünitesi (Motor Gövdesi + Eksantrik Volan + Tahrik Pistonu)
   const motorHousing = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.34, 24), castIronMat);
   motorHousing.rotation.x = Math.PI / 2;
-  motorHousing.position.set(0, 2.08, -0.32);
+  motorHousing.position.set(0, 2.32, -0.32);
 
   const flywheelGroup = new THREE.Group();
-  flywheelGroup.position.set(0, 2.08, -0.08);
+  flywheelGroup.position.set(0, 2.32, -0.08);
   const flywheel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.05, 32), brassMat);
   flywheel.rotation.x = Math.PI / 2;
   const crankPin = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 16), chromeMat);
@@ -531,7 +531,7 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   const pointerNdc = new THREE.Vector2();
   const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const hitPoint = new THREE.Vector3();
-  const eqY = -0.05;
+  const eqY = 0.22;
 
   const updatePointer = (e: PointerEvent) => {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -621,12 +621,15 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     // Eksantrik volan ve üst piston hareketi
     flywheelGroup.rotation.z = drivePhase;
     const pistonDisp = (f0 / 4.0) * 0.16 * Math.cos(drivePhase);
-    const springTopY = 1.62 + pistonDisp;
+    const springTopY = 1.86 + pistonDisp;
     drivePiston.position.set(0, springTopY + 0.22, 0);
     upperHook.position.set(0, springTopY, 0);
 
     // Kütle konumu ve yay sarmalı dizilimi
-    const massY = eqY + x * 2.1;
+    const minMassY = -1.0;
+    const maxMassY = springTopY - 0.52;
+    const massY = Math.max(minMassY, Math.min(maxMassY, eqY + x * 1.15));
+    if (massY <= minMassY && (state[1] ?? 0) < 0) { state = [state[0] ?? 0, -(state[1] ?? 0) * 0.4]; }
     massGroup.position.y = massY - eqY;
     const springBottomY = massY + 0.26;
     const span = Math.max(0.25, springTopY - springBottomY);
