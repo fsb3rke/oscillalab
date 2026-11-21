@@ -6,6 +6,7 @@ import { getLocale, setLocale, t, tx, onLocaleChange, type Locale, type DictKey 
 import { getThemeMode, setThemeMode, type ThemeMode } from '../core/theme';
 import { mountSim3D } from './sim3d-viewer';
 import { mountSetupViewer } from './setup-viewer';
+import { mountAnalysisViewer } from './analysis-viewer';
 
 type TabKey = 'setup' | 'theory' | 'sim3d' | 'analysis';
 
@@ -247,6 +248,8 @@ export function renderApp(root: HTMLElement): void {
         cleanupActive = mountSim3D(workspace, activeExp);
       } else if (activeTab === 'setup') {
         cleanupActive = mountSetupViewer(workspace, activeExp);
+      } else if (activeTab === 'analysis') {
+        mountAnalysisViewer(workspace, activeExp);
       } else {
         const activeTabObj = TABS.find((tab) => tab.key === activeTab);
         workspace.append(
