@@ -96,7 +96,7 @@ export function mountSetupViewer(container: HTMLElement, exp: ExperimentModule):
   });
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
-    if (!file) return;
+    if (!file || !file.type.startsWith("image/") || file.size > 15 * 1024 * 1024) return;
     if (objectUrlToRevoke) URL.revokeObjectURL(objectUrlToRevoke);
     objectUrlToRevoke = URL.createObjectURL(file);
     currentImgSrc = objectUrlToRevoke;

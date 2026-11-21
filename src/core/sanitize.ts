@@ -24,3 +24,11 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   }
   return node;
 }
+
+export function sanitizeCsvCell(value: string | number): string {
+  const str = String(value);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+}
