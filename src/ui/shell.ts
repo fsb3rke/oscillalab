@@ -2,22 +2,29 @@ import { getAllExperiments } from '../core/registry';
 import type { ExperimentModule } from '../core/types';
 import { el } from '../core/sanitize';
 import { stepRK4 } from '../core/rk4';
+import { getLocale, setLocale, t, tx, onLocaleChange, type Locale, type DictKey } from '../core/i18n';
+import { getThemeMode, setThemeMode, type ThemeMode } from '../core/theme';
 
 type TabKey = 'setup' | 'theory' | 'sim3d' | 'analysis';
 
-const TABS: readonly { key: TabKey; label: string }[] = [
-  { key: 'setup', label: '01 / Düzenek ve Parçalar' },
-  { key: 'theory', label: '02 / Teori' },
-  { key: 'sim3d', label: '03 / 3B Simülasyon' },
-  { key: 'analysis', label: '04 / Veri ve Hata Analizi' }
+const TABS: readonly { key: TabKey; labelKey: DictKey }[] = [
+  { key: 'setup', labelKey: 'tabSetup' },
+  { key: 'theory', labelKey: 'tabTheory' },
+  { key: 'sim3d', labelKey: 'tabSim3d' },
+  { key: 'analysis', labelKey: 'tabAnalysis' }
 ];
+
+function getCssVar(name: string, fallback: string): string {
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return val || fallback;
+}
 
 function mountLiveScope(canvas: HTMLCanvasElement): () => void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return () => {};
 
   let state = [1.0, 0.0];
-  let t = 0;
+  let tSec = 0;
   const history: number[] = [];
   let rafId = 0;
 
@@ -44,7 +51,7 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
 
     ctx.clearRect(0, 0, w, h);
 
-    ctx.strokeStyle = '#e4e4e7';
+    ctx.strokeStyle = getCssVar('--scope-axis', '#e4e4e7');
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, h / 2);
@@ -52,8 +59,8 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
     ctx.stroke();
 
     for (let i = 0; i < 4; i++) {
-      state = stepRK4(state, t, 0.004, derivs);
-      t += 0.004;
+      state = stepRK4(state, tSec, 0.004, derivs);
+      tSec += 0.004;
     }
 
     if (Math.abs(state[0] ?? 0) < 0.03 && Math.abs(state[1] ?? 0) < 0.05) {
@@ -64,7 +71,7 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
     const maxPts = Math.max(60, Math.floor(w / 2));
     while (history.length > maxPts) history.shift();
 
-    ctx.strokeStyle = '#ea580c';
+    ctx.strokeStyle = getCssVar('--signal', '#ea580c');
     ctx.lineWidth = 1.75;
     ctx.beginPath();
     for (let i = 0; i < history.length; i++) {
@@ -77,7 +84,7 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
 
     const lastX = ((history.length - 1) / maxPts) * w;
     const lastY = h / 2 - (history[history.length - 1] ?? 0) * (h * 0.38);
-    ctx.fillStyle = '#1d4ed8';
+    ctx.fillStyle = getCssVar('--accent', '#1d4ed8');
     ctx.beginPath();
     ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
     ctx.fill();
@@ -95,6 +102,46 @@ export function renderApp(root: HTMLElement): void {
   let activeTab: TabKey = 'setup';
   let cleanupScope: (() => void) | null = null;
 
+  function buildControls(): HTMLElement {
+    const wrap = el('div', { className: 'controls' });
+
+    // Dil Seçici (TR | EN)
+    const langGroup = el('div', { className: 'segmented', attrs: { role: 'group', 'aria-label': 'Language' } });
+    const locales: readonly Locale[] = ['tr', 'en'];
+    for (const loc of locales) {
+      const btn = el('button', {
+        className: 'seg-btn',
+        text: loc.toUpperCase(),
+        attrs: { 'aria-pressed': String(getLocale() === loc) }
+      });
+      btn.addEventListener('click', () => setLocale(loc));
+      langGroup.append(btn);
+    }
+
+    // Tema Seçici (Sistem | Açık | Koyu)
+    const themeGroup = el('div', { className: 'segmented', attrs: { role: 'group', 'aria-label': 'Theme' } });
+    const modes: readonly { mode: ThemeMode; labelKey: DictKey }[] = [
+      { mode: 'system', labelKey: 'themeAuto' },
+      { mode: 'light', labelKey: 'themeLight' },
+      { mode: 'dark', labelKey: 'themeDark' }
+    ];
+    for (const item of modes) {
+      const btn = el('button', {
+        className: 'seg-btn',
+        text: t(item.labelKey),
+        attrs: { 'aria-pressed': String(getThemeMode() === item.mode) }
+      });
+      btn.addEventListener('click', () => {
+        setThemeMode(item.mode);
+        draw();
+      });
+      themeGroup.append(btn);
+    }
+
+    wrap.append(langGroup, themeGroup);
+    return wrap;
+  }
+
   function draw(): void {
     if (cleanupScope) {
       cleanupScope();
@@ -108,17 +155,19 @@ export function renderApp(root: HTMLElement): void {
     const brand = el('div', { className: 'brand' });
     const mark = el('span', { className: 'brand-mark' });
     mark.append(el('span', { className: 'brand-dot' }), document.createTextNode('OscillaLab'));
-    brand.append(mark, el('span', { className: 'brand-meta', text: 'FİZİK BÖLÜMÜ • LAB-II' }));
+    brand.append(mark, el('span', { className: 'brand-meta', text: t('brandMeta') }));
     topbarInner.append(brand);
 
+    const rightControls = buildControls();
     if (activeExp) {
-      const backBtn = el('button', { className: 'btn btn-outline', text: '← Deney Listesi' });
+      const backBtn = el('button', { className: 'btn btn-outline', text: t('backToList') });
       backBtn.addEventListener('click', () => {
         activeExp = null;
         draw();
       });
-      topbarInner.append(backBtn);
+      rightControls.prepend(backBtn);
     }
+    topbarInner.append(rightControls);
     topbar.append(topbarInner);
 
     const main = el('main', { className: 'container' });
@@ -128,20 +177,14 @@ export function renderApp(root: HTMLElement): void {
 
       const intro = el('div');
       intro.append(
-        el('span', { className: 'kicker', text: 'TİTREŞİM VE DALGALAR LABORATUVARI' }),
-        el('h1', { className: 'page-title', text: 'Deney Düzenekleri ve Sayısal Simülasyon' }),
-        el('p', {
-          className: 'page-lead',
-          text: 'Laboratuvardaki deney düzeneklerinin parça incelemesi, RK4 tabanlı 3B hareket çözümleri ve ölçüm hata analizleri.'
-        })
+        el('span', { className: 'kicker', text: t('kicker') }),
+        el('h1', { className: 'page-title', text: t('pageTitle') }),
+        el('p', { className: 'page-lead', text: t('pageLead') })
       );
 
       const scopeBox = el('aside', { className: 'scope-box' });
       const scopeHead = el('div', { className: 'scope-header' });
-      scopeHead.append(
-        el('span', { text: 'RK4 • SÖNÜMLÜ SALINIM' }),
-        el('span', { text: 'dt = 0.004 s' })
-      );
+      scopeHead.append(el('span', { text: t('scopeTitle') }), el('span', { text: 'dt = 0.004 s' }));
       const canvas = el('canvas', { className: 'scope-canvas' });
       scopeBox.append(scopeHead, canvas);
 
@@ -153,8 +196,8 @@ export function renderApp(root: HTMLElement): void {
       const experiments = getAllExperiments();
       const secBar = el('div', { className: 'section-bar' });
       secBar.append(
-        el('span', { className: 'section-label', text: 'Deney Föyleri' }),
-        el('span', { className: 'exp-code', text: `${experiments.length} DENEY` })
+        el('span', { className: 'section-label', text: t('catalogLabel') }),
+        el('span', { className: 'exp-code', text: `${experiments.length} ${t('expCount')}` })
       );
       main.append(secBar);
 
@@ -162,19 +205,16 @@ export function renderApp(root: HTMLElement): void {
       if (experiments.length === 0) {
         const row = el('div', { className: 'exp-row' });
         row.append(
-          el('span', { className: 'exp-code', text: 'FİZ-203 // 00' }),
-          el('span', { className: 'exp-name', text: 'Henüz deney eklenmedi' }),
-          el('span', {
-            className: 'exp-desc',
-            text: 'Deney modülleri eklendikçe bu listede yer alacaktır.'
-          }),
+          el('span', { className: 'exp-code', text: t('emptyCode') }),
+          el('span', { className: 'exp-name', text: t('emptyTitle') }),
+          el('span', { className: 'exp-desc', text: t('emptyDesc') }),
           el('span', { className: 'exp-code', text: '—' })
         );
         list.append(row);
       } else {
         for (const exp of experiments) {
           const row = el('div', { className: 'exp-row' });
-          const openBtn = el('button', { className: 'btn', text: 'Deneye Git →' });
+          const openBtn = el('button', { className: 'btn', text: t('openExp') });
           openBtn.addEventListener('click', () => {
             activeExp = exp;
             activeTab = 'setup';
@@ -182,8 +222,8 @@ export function renderApp(root: HTMLElement): void {
           });
           row.append(
             el('span', { className: 'exp-code', text: exp.courseCode }),
-            el('span', { className: 'exp-name', text: exp.title }),
-            el('span', { className: 'exp-desc', text: exp.summary }),
+            el('span', { className: 'exp-name', text: tx(exp.title) }),
+            el('span', { className: 'exp-desc', text: tx(exp.summary) }),
             openBtn
           );
           list.append(row);
@@ -191,10 +231,10 @@ export function renderApp(root: HTMLElement): void {
       }
       main.append(list);
     } else {
-      const expHead = el('div', { style: 'margin-bottom: 1.25rem;' } as never);
+      const expHead = el('div', { attrs: { style: 'margin-bottom: 1.25rem;' } });
       expHead.append(
         el('span', { className: 'kicker', text: activeExp.courseCode }),
-        el('h1', { className: 'page-title', text: activeExp.title })
+        el('h1', { className: 'page-title', text: tx(activeExp.title) })
       );
       main.append(expHead);
 
@@ -202,7 +242,7 @@ export function renderApp(root: HTMLElement): void {
       for (const tab of TABS) {
         const btn = el('button', {
           className: 'tab-btn',
-          text: tab.label,
+          text: t(tab.labelKey),
           attrs: {
             role: 'tab',
             'aria-selected': String(activeTab === tab.key)
@@ -217,11 +257,12 @@ export function renderApp(root: HTMLElement): void {
       main.append(tabBar);
 
       const workspace = el('section', { className: 'workspace' });
+      const activeTabObj = TABS.find((tab) => tab.key === activeTab);
       workspace.append(
-        el('h3', { text: TABS.find((t) => t.key === activeTab)?.label ?? '' }),
+        el('h3', { text: activeTabObj ? t(activeTabObj.labelKey) : '' }),
         el('p', {
           className: 'exp-desc',
-          text: `${activeExp.title} içeriği hazırlanıyor.`
+          text: `${tx(activeExp.title)} — ${t('preparing')}`
         })
       );
       main.append(workspace);
@@ -229,14 +270,12 @@ export function renderApp(root: HTMLElement): void {
 
     const footer = el('footer', { className: 'footer' });
     const footerInner = el('div', { className: 'footer-inner' });
-    footerInner.append(
-      el('span', { text: 'OscillaLab — Titreşim ve Dalgalar Laboratuvarı' }),
-      el('span', { text: 'Çevrimdışı Çalışma Desteği' })
-    );
+    footerInner.append(el('span', { text: t('footerLeft') }), el('span', { text: t('footerRight') }));
     footer.append(footerInner);
 
     root.append(topbar, main, footer);
   }
 
+  onLocaleChange(draw);
   draw();
 }

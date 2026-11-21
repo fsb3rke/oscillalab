@@ -1,18 +1,37 @@
-:root {
+:root,
+[data-theme="light"] {
   --bg: #fafafa;
   --surface: #ffffff;
   --surface-subtle: #f4f4f5;
+  --dot: #d4d4d8;
+  --topbar-bg: rgba(255, 255, 255, 0.92);
   --border: #e4e4e7;
   --border-strong: #d4d4d8;
   --ink: #09090b;
   --ink-muted: #52525b;
   --ink-faint: #71717a;
   --accent: #1d4ed8;
-  --accent-soft: #eff6ff;
   --signal: #ea580c;
+  --scope-axis: #e4e4e7;
   --radius: 6px;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  --bg: #0c0c0e;
+  --surface: #141417;
+  --surface-subtle: #1c1c21;
+  --dot: #27272a;
+  --topbar-bg: rgba(20, 20, 23, 0.9);
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --ink: #f4f4f5;
+  --ink-muted: #a1a1aa;
+  --ink-faint: #71717a;
+  --accent: #60a5fa;
+  --signal: #fb923c;
+  --scope-axis: #27272a;
 }
 
 * {
@@ -23,7 +42,7 @@
 
 body {
   background-color: var(--bg);
-  background-image: radial-gradient(#d4d4d8 0.75px, transparent 0.75px);
+  background-image: radial-gradient(var(--dot) 0.75px, transparent 0.75px);
   background-size: 20px 20px;
   color: var(--ink);
   font-family: var(--font-sans);
@@ -32,10 +51,11 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .topbar {
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--topbar-bg);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -51,6 +71,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .brand {
@@ -81,6 +102,43 @@ body {
   font-size: 0.72rem;
   color: var(--ink-faint);
   letter-spacing: 0.02em;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.segmented {
+  display: inline-flex;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+}
+
+.seg-btn {
+  background: transparent;
+  color: var(--ink-muted);
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.seg-btn:hover {
+  color: var(--ink);
+}
+
+.seg-btn[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
 }
 
 .container {
@@ -136,7 +194,6 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .scope-header {
@@ -177,7 +234,6 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .exp-row {
@@ -224,7 +280,7 @@ body {
 
 .btn {
   background: var(--ink);
-  color: #ffffff;
+  color: var(--bg);
   border: 1px solid var(--ink);
   border-radius: var(--radius);
   padding: 0.5rem 0.9rem;
@@ -239,6 +295,7 @@ body {
 .btn:hover {
   background: var(--accent);
   border-color: var(--accent);
+  color: #ffffff;
 }
 
 .btn-outline {

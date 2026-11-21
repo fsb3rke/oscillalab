@@ -1,6 +1,8 @@
+import type { LocalizedText } from './i18n';
+
 export interface ExperimentParameter {
   id: string;
-  label: string;
+  label: LocalizedText;
   unit: string;
   min: number;
   max: number;
@@ -10,17 +12,17 @@ export interface ExperimentParameter {
 
 export interface HotspotItem {
   id: number;
-  title: string;
-  description: string;
+  title: LocalizedText;
+  description: LocalizedText;
   xPercent: number;
   yPercent: number;
 }
 
 export interface ExperimentModule {
   readonly id: string;
-  readonly title: string;
+  readonly title: LocalizedText;
   readonly courseCode: string;
-  readonly summary: string;
+  readonly summary: LocalizedText;
   readonly setupImageUrl?: string;
   readonly parameters: readonly ExperimentParameter[];
   readonly hotspots: readonly HotspotItem[];
