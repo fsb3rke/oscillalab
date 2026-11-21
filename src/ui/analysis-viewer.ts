@@ -126,7 +126,7 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
       }
     }
 
-    summaryBox.innerHTML = "";
+    summaryBox.replaceChildren();
     if (fit && fit.slope > 1e-9) {
       const fourPiSq = 4 * Math.PI * Math.PI;
       const derivedParam = fourPiSq / fit.slope;
@@ -145,7 +145,7 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
   };
 
   const renderTable = () => {
-    table.innerHTML = "";
+    table.replaceChildren();
     const thead = el("thead"), headRow = el("tr", { attrs: { style: "background:var(--surface-subtle); border-bottom:1px solid var(--border);" } });
     for (const h of [meta.xHeader, "T₁ (s)", "T₂ (s)", "T₃ (s)", "T̄ ± σ_T̄", "T² ± δ(T²)", ""]) {
       headRow.append(el("th", { text: h, attrs: { style: "padding:0.45rem 0.5rem; text-align:left; font-weight:600;" } }));
