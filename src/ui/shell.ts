@@ -72,8 +72,23 @@ export function renderApp(root: HTMLElement): void {
     const topbarInner = el('div', { className: 'topbar-inner' });
 
     const brand = el('div', { className: 'brand' });
+    const brandTitle = el('span', {
+      className: 'brand-mark',
+      text: 'OscillaLab',
+      attrs: { role: 'button', tabindex: '0', style: 'cursor:pointer;' }
+    });
+    const goHome = () => {
+      if (activeExp !== null) {
+        activeExp = null;
+        draw();
+      }
+    };
+    brandTitle.addEventListener('click', goHome);
+    brandTitle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') goHome();
+    });
     brand.append(
-      el('span', { className: 'brand-mark', text: 'OscillaLab' }),
+      brandTitle,
       el('span', { className: 'brand-meta', text: t('brandMeta') })
     );
     topbarInner.append(brand);
