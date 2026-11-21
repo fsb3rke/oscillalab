@@ -5,6 +5,7 @@ import { stepRK4 } from '../core/rk4';
 import { getLocale, setLocale, t, tx, onLocaleChange, type Locale, type DictKey } from '../core/i18n';
 import { getThemeMode, setThemeMode, type ThemeMode } from '../core/theme';
 import { mountSim3D } from './sim3d-viewer';
+import { mountSetupViewer } from './setup-viewer';
 
 type TabKey = 'setup' | 'theory' | 'sim3d' | 'analysis';
 
@@ -245,18 +246,7 @@ export function renderApp(root: HTMLElement): void {
       if (activeTab === 'sim3d') {
         cleanupActive = mountSim3D(workspace, activeExp);
       } else if (activeTab === 'setup') {
-        const partsGrid = el('div', { attrs: { style: 'display:grid; gap:0.75rem;' } });
-        for (const hs of activeExp.hotspots) {
-          const item = el('div', {
-            attrs: { style: 'padding:0.85rem; border:1px solid var(--border); border-radius:var(--radius);' }
-          });
-          item.append(
-            el('div', { attrs: { style: 'font-weight:600; margin-bottom:0.25rem;' }, text: `0${hs.id}. ${tx(hs.title)}` }),
-            el('p', { className: 'exp-desc', text: tx(hs.description) })
-          );
-          partsGrid.append(item);
-        }
-        workspace.append(partsGrid);
+        cleanupActive = mountSetupViewer(workspace, activeExp);
       } else {
         const activeTabObj = TABS.find((tab) => tab.key === activeTab);
         workspace.append(
