@@ -6,10 +6,10 @@ import { stepRK4 } from '../core/rk4';
 type TabKey = 'setup' | 'theory' | 'sim3d' | 'analysis';
 
 const TABS: readonly { key: TabKey; label: string }[] = [
-  { key: 'setup', label: '01 / Orijinal Düzenek' },
-  { key: 'theory', label: '02 / Teorik Model' },
-  { key: 'sim3d', label: '03 / 3B Dijital İkiz' },
-  { key: 'analysis', label: '04 / Veri & Hata Analizi' }
+  { key: 'setup', label: '01 / Düzenek ve Parçalar' },
+  { key: 'theory', label: '02 / Teori' },
+  { key: 'sim3d', label: '03 / 3B Simülasyon' },
+  { key: 'analysis', label: '04 / Veri ve Hata Analizi' }
 ];
 
 function mountLiveScope(canvas: HTMLCanvasElement): () => void {
@@ -44,7 +44,6 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
 
     ctx.clearRect(0, 0, w, h);
 
-    // Eksen çizgisi
     ctx.strokeStyle = '#e4e4e7';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -52,7 +51,6 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
     ctx.lineTo(w, h / 2);
     ctx.stroke();
 
-    // RK4 adımı
     for (let i = 0; i < 4; i++) {
       state = stepRK4(state, t, 0.004, derivs);
       t += 0.004;
@@ -66,7 +64,6 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
     const maxPts = Math.max(60, Math.floor(w / 2));
     while (history.length > maxPts) history.shift();
 
-    // Sinyal eğrisi
     ctx.strokeStyle = '#ea580c';
     ctx.lineWidth = 1.75;
     ctx.beginPath();
@@ -78,7 +75,6 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
     }
     ctx.stroke();
 
-    // Anlık uç noktası
     const lastX = ((history.length - 1) / maxPts) * w;
     const lastY = h / 2 - (history[history.length - 1] ?? 0) * (h * 0.38);
     ctx.fillStyle = '#1d4ed8';
@@ -106,14 +102,13 @@ export function renderApp(root: HTMLElement): void {
     }
     root.replaceChildren();
 
-    // Üst Navigasyon
     const topbar = el('header', { className: 'topbar' });
     const topbarInner = el('div', { className: 'topbar-inner' });
 
     const brand = el('div', { className: 'brand' });
     const mark = el('span', { className: 'brand-mark' });
     mark.append(el('span', { className: 'brand-dot' }), document.createTextNode('OscillaLab'));
-    brand.append(mark, el('span', { className: 'brand-meta', text: 'PHYS-LAB // v0.1' }));
+    brand.append(mark, el('span', { className: 'brand-meta', text: 'FİZİK BÖLÜMÜ • LAB-II' }));
     topbarInner.append(brand);
 
     if (activeExp) {
@@ -133,19 +128,19 @@ export function renderApp(root: HTMLElement): void {
 
       const intro = el('div');
       intro.append(
-        el('span', { className: 'kicker', text: 'FİZİK LABORATUVARI • TİTREŞİM VE DALGALAR' }),
-        el('h1', { className: 'page-title', text: 'Orijinal Düzenek Tabanlı 3B Deney Platformu' }),
+        el('span', { className: 'kicker', text: 'TİTREŞİM VE DALGALAR LABORATUVARI' }),
+        el('h1', { className: 'page-title', text: 'Deney Düzenekleri ve Sayısal Simülasyon' }),
         el('p', {
           className: 'page-lead',
-          text: 'Gerçek laboratuvar ekipmanlarının optik ölçümlerini ve 4. mertebe Runge-Kutta (RK4) sayısal çözücüsünü birleştiren etkileşimli deney ortamı.'
+          text: 'Laboratuvardaki deney düzeneklerinin parça incelemesi, RK4 tabanlı 3B hareket çözümleri ve ölçüm hata analizleri.'
         })
       );
 
       const scopeBox = el('aside', { className: 'scope-box' });
       const scopeHead = el('div', { className: 'scope-header' });
       scopeHead.append(
-        el('span', { text: 'RK4 SOLVER // DAMPED HARMONIC' }),
-        el('span', { text: 'dt = 0.004s' })
+        el('span', { text: 'RK4 • SÖNÜMLÜ SALINIM' }),
+        el('span', { text: 'dt = 0.004 s' })
       );
       const canvas = el('canvas', { className: 'scope-canvas' });
       scopeBox.append(scopeHead, canvas);
@@ -158,8 +153,8 @@ export function renderApp(root: HTMLElement): void {
       const experiments = getAllExperiments();
       const secBar = el('div', { className: 'section-bar' });
       secBar.append(
-        el('span', { className: 'section-label', text: 'Deney Kataloğu' }),
-        el('span', { className: 'exp-code', text: `${experiments.length} MODÜL AKTİF` })
+        el('span', { className: 'section-label', text: 'Deney Föyleri' }),
+        el('span', { className: 'exp-code', text: `${experiments.length} DENEY` })
       );
       main.append(secBar);
 
@@ -167,19 +162,19 @@ export function renderApp(root: HTMLElement): void {
       if (experiments.length === 0) {
         const row = el('div', { className: 'exp-row' });
         row.append(
-          el('span', { className: 'exp-code', text: 'EXP-00 // HAZIR' }),
-          el('span', { className: 'exp-name', text: 'Çekirdek Mimari Kuruldu' }),
+          el('span', { className: 'exp-code', text: 'FİZ-203 // 00' }),
+          el('span', { className: 'exp-name', text: 'Henüz deney eklenmedi' }),
           el('span', {
             className: 'exp-desc',
-            text: 'Plugin kayıt sistemi aktif. İlk deney modülü eklendiğinde bu çizelgede yer alacaktır.'
+            text: 'Deney modülleri eklendikçe bu listede yer alacaktır.'
           }),
-          el('span', { className: 'exp-code', text: 'Beklemede' })
+          el('span', { className: 'exp-code', text: '—' })
         );
         list.append(row);
       } else {
         for (const exp of experiments) {
           const row = el('div', { className: 'exp-row' });
-          const openBtn = el('button', { className: 'btn', text: 'Düzeneği Aç →' });
+          const openBtn = el('button', { className: 'btn', text: 'Deneye Git →' });
           openBtn.addEventListener('click', () => {
             activeExp = exp;
             activeTab = 'setup';
@@ -226,7 +221,7 @@ export function renderApp(root: HTMLElement): void {
         el('h3', { text: TABS.find((t) => t.key === activeTab)?.label ?? '' }),
         el('p', {
           className: 'exp-desc',
-          text: `${activeExp.title} için bileşen yuvası hazır.`
+          text: `${activeExp.title} içeriği hazırlanıyor.`
         })
       );
       main.append(workspace);
@@ -235,8 +230,8 @@ export function renderApp(root: HTMLElement): void {
     const footer = el('footer', { className: 'footer' });
     const footerInner = el('div', { className: 'footer-inner' });
     footerInner.append(
-      el('span', { text: 'OscillaLab • Açık Kaynak Fizik Dijital İkiz Platformu' }),
-      el('span', { text: 'OFFLINE-READY // STRICT-CSP' })
+      el('span', { text: 'OscillaLab — Titreşim ve Dalgalar Laboratuvarı' }),
+      el('span', { text: 'Çevrimdışı Çalışma Desteği' })
     );
     footer.append(footerInner);
 
