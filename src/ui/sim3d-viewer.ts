@@ -19,12 +19,11 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
 
   const layout = el('div', {
     attrs: {
-      style: 'display:grid; grid-template-columns: 1.5fr 1fr; gap: 1.25rem; align-items: start;'
+      style: 'display:grid; grid-template-columns: 1.55fr 1fr; gap: 1.25rem; align-items: start;'
     }
   });
 
-  // Sol: Three.js 3B Alanı + Alt Canlı Grafik
-  const leftCol = el('div', { attrs: { style: 'display:flex; flex-direction:column; gap:1rem;' } });
+  const leftCol = el('div', { attrs: { style: 'display:flex; flex-direction:column; gap:0.85rem;' } });
   const viewport = el('div', {
     attrs: {
       style: 'width:100%; height:360px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; position:relative;'
@@ -33,19 +32,18 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
 
   const hud = el('div', {
     attrs: {
-      style: 'position:absolute; top:10px; left:12px; font-family:var(--font-mono); font-size:0.75rem; color:var(--ink-muted); pointer-events:none;'
+      style: 'position:absolute; top:10px; left:12px; font-family:var(--font-mono); font-size:0.74rem; color:var(--ink-muted); pointer-events:none; background:var(--surface); padding:3px 7px; border-radius:4px; border:1px solid var(--border);'
     }
   });
   viewport.append(hud);
 
   const plotCanvas = el('canvas', {
     attrs: {
-      style: 'width:100%; height:110px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); display:block;'
+      style: 'width:100%; height:105px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); display:block;'
     }
   });
   leftCol.append(viewport, plotCanvas);
 
-  // Sağ: Parametre Kontrolleri
   const panel = el('div', {
     attrs: {
       style: 'background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem; display:flex; flex-direction:column; gap:0.9rem;'
@@ -60,18 +58,23 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
     const valSpan = el('span', { text: `${p.defaultValue} ${p.unit}` });
     top.append(el('span', { text: tx(p.label) }), valSpan);
 
+    const initPct = ((p.defaultValue - p.min) / (p.max - p.min)) * 100;
     const input = el('input', {
+      className: 'lab-slider',
       attrs: {
         type: 'range',
         min: String(p.min),
         max: String(p.max),
         step: String(p.step),
-        value: String(p.defaultValue)
+        value: String(p.defaultValue),
+        style: `--pct: ${initPct.toFixed(1)}%`
       }
     });
 
     input.addEventListener('input', () => {
       const val = clampNumber(input.value, p.min, p.max, p.defaultValue);
+      const pct = ((val - p.min) / (p.max - p.min)) * 100;
+      input.style.setProperty('--pct', `${pct.toFixed(1)}%`);
       params[p.id] = val;
       valSpan.textContent = `${val} ${p.unit}`;
       if (p.id === 'theta0') {
@@ -113,18 +116,18 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
   layout.append(leftCol, panel);
   container.append(layout);
 
-  // Three.js Sahnesi
   const isDark = resolveEffectiveTheme() === 'dark';
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(isDark ? 0x141417 : 0xf4f4f5);
+  scene.background = new THREE.Color(isDark ? 0x21201d : 0xefede8);
 
-  const camera = new THREE.PerspectiveCamera(42, viewport.clientWidth / 360, 0.1, 100);
+  const width = viewport.clientWidth || 540;
+  const camera = new THREE.PerspectiveCamera(42, width / 360, 0.1, 100);
   camera.position.set(0, 2.2, 4.6);
   camera.lookAt(0, 0.2, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(viewport.clientWidth, 360);
+  renderer.setSize(width, 360);
   viewport.append(renderer.domElement);
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.75);
@@ -132,7 +135,6 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
   dirLight.position.set(3, 5, 4);
   scene.add(ambient, dirLight);
 
-  // Üst sabitleme tablası
   const mountPlate = new THREE.Mesh(
     new THREE.BoxGeometry(1.6, 0.14, 1.6),
     new THREE.MeshStandardMaterial({ color: 0x3f3f46, metalness: 0.6, roughness: 0.35 })
@@ -140,7 +142,6 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
   mountPlate.position.y = 1.65;
   scene.add(mountPlate);
 
-  // Çelik burulma teli
   const wire = new THREE.Mesh(
     new THREE.CylinderGeometry(0.022, 0.022, 1.75, 16),
     new THREE.MeshStandardMaterial({ color: 0xa1a1aa, metalness: 0.85, roughness: 0.2 })
@@ -148,24 +149,32 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
   wire.position.y = 0.78;
   scene.add(wire);
 
-  // Dönen pirinç/alüminyum disk + referans işaret çubuğu
   const rotorGroup = new THREE.Group();
   rotorGroup.position.y = -0.1;
 
+  // Pirinç disk laboratuvardaki 12 cm yarıçaplı tablaya göre ölçeklendi
   const disc = new THREE.Mesh(
     new THREE.CylinderGeometry(1.15, 1.15, 0.16, 48),
     new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.72, roughness: 0.28 })
   );
   const marker = new THREE.Mesh(
     new THREE.BoxGeometry(1.12, 0.04, 0.06),
-    new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.4 })
   );
   marker.position.set(0.56, 0.09, 0);
 
-  rotorGroup.add(disc, marker);
+  // Steiner yardımcı silindir kütleleri (I parametresiyle dışa kayar)
+  const auxGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.22, 24);
+  const auxMat = new THREE.MeshStandardMaterial({ color: 0x52525b, metalness: 0.8, roughness: 0.25 });
+  const auxLeft = new THREE.Mesh(auxGeo, auxMat);
+  const auxRight = new THREE.Mesh(auxGeo, auxMat);
+  auxLeft.position.set(-0.55, 0.18, 0);
+  auxRight.position.set(0.55, 0.18, 0);
+
+  rotorGroup.add(disc, marker, auxLeft, auxRight);
   scene.add(rotorGroup);
 
-  const gridHelper = new THREE.GridHelper(5, 10, 0x71717a, 0xd4d4d8);
+  const gridHelper = new THREE.GridHelper(5, 10, 0x78716c, 0xdcd8cf);
   gridHelper.position.y = -0.95;
   scene.add(gridHelper);
 
@@ -174,6 +183,11 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
   const dt = 0.002;
 
   const animate = () => {
+    const inertiaVal = params.inertia ?? 0.012;
+    const radialOffset = 0.25 + ((inertiaVal - 0.002) / 0.048) * 0.72;
+    auxLeft.position.x = -radialOffset;
+    auxRight.position.x = radialOffset;
+
     if (!paused) {
       // const subSteps = 4; // 60Hz ekranda yavas kaldi
       const subSteps = 8;
@@ -189,10 +203,9 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
 
     hud.textContent = `t = ${tSec.toFixed(2)} s  |  θ = ${(theta * 180 / Math.PI).toFixed(1)}°  |  ω = ${omega.toFixed(2)} rad/s`;
 
-    // Alt grafik
     if (plotCtx) {
-      const w = plotCanvas.clientWidth;
-      const h = 110;
+      const w = plotCanvas.clientWidth || 540;
+      const h = 105;
       if (plotCanvas.width !== w) {
         plotCanvas.width = w;
         plotCanvas.height = h;
@@ -203,18 +216,18 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
       }
 
       plotCtx.clearRect(0, 0, w, h);
-      plotCtx.strokeStyle = isDark ? '#27272a' : '#e4e4e7';
+      plotCtx.strokeStyle = isDark ? '#38352f' : '#dcd8cf';
       plotCtx.beginPath();
       plotCtx.moveTo(0, h / 2);
       plotCtx.lineTo(w, h / 2);
       plotCtx.stroke();
 
-      plotCtx.strokeStyle = '#ea580c';
+      plotCtx.strokeStyle = '#b91c1c';
       plotCtx.lineWidth = 1.6;
       plotCtx.beginPath();
       for (let i = 0; i < trace.length; i++) {
         const px = (i / Math.max(1, Math.floor(w / 2))) * w;
-        const py = h / 2 - (trace[i] ?? 0) * 26;
+        const py = h / 2 - (trace[i] ?? 0) * 24;
         if (i === 0) plotCtx.moveTo(px, py);
         else plotCtx.lineTo(px, py);
       }
