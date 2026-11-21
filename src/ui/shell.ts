@@ -26,7 +26,7 @@ export function renderApp(root: HTMLElement): void {
     const wrap = el('div', { className: 'controls' });
 
     const langGroup = el('div', { className: 'segmented', attrs: { role: 'group', 'aria-label': 'Dil' } });
-    const locales: readonly Locale[] = ['tr', 'en'];
+    const locales: readonly Locale[] = ['tr', 'en', 'de', 'fr'];
     for (const loc of locales) {
       const btn = el('button', {
         className: 'seg-btn',
@@ -125,8 +125,8 @@ export function renderApp(root: HTMLElement): void {
       const thead = el('thead');
       const hRow = el('tr');
       hRow.append(
-        el('th', { text: loc === 'tr' ? 'Kod' : 'Code' }),
-        el('th', { text: loc === 'tr' ? 'Deney Adı ve Kapsamı' : 'Experiment & Scope' }),
+        el('th', { text: ({ tr: 'Kod', en: 'Code', de: 'Code', fr: 'Code' })[loc] }),
+        el('th', { text: ({ tr: 'Deney Adı ve Kapsamı', en: 'Experiment & Scope', de: 'Versuchstitel & Inhalt', fr: 'Titre et Contenu de l’Expérience' })[loc] }),
         el('th', { text: '' })
       );
       thead.append(hRow);
@@ -163,7 +163,7 @@ export function renderApp(root: HTMLElement): void {
       // Sağ: Laboratuvar Kullanım Notu
       const noteBox = el('aside', { className: 'note-box' });
       noteBox.append(
-        el('h3', { text: loc === 'tr' ? 'Yöntem ve Sayısal Altyapı' : 'Methodology & Numerical Core' })
+        el('h3', { text: ({ tr: 'Yöntem ve Sayısal Altyapı', en: 'Methodology & Numerical Core', de: 'Methodik & Numerischer Kern', fr: 'Méthodologie et Noyau Numérique' })[loc] })
       );
       const ul = el('ul');
       const notes = loc === 'tr'
@@ -187,7 +187,7 @@ export function renderApp(root: HTMLElement): void {
       });
       creditBox.append(
         el('div', {
-          text: loc === 'tr' ? 'Proje Yürütücüsü / Geliştirici' : 'Principal Developer',
+          text: ({ tr: 'Proje Yürütücüsü / Geliştirici', en: 'Principal Developer', de: 'Projektleiter / Entwickler', fr: 'Développeur Principal' })[loc],
           attrs: { style: 'font-weight:600; color:var(--ink);' }
         }),
         el('div', {
