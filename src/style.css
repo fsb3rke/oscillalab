@@ -362,3 +362,78 @@ input[type="range"].lab-slider::-webkit-slider-thumb {
   border: 1px solid var(--surface);
   margin-top: -6px;
 }
+
+.lang-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.lang-trigger {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.28rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.lang-trigger:hover {
+  background: var(--surface-subtle);
+}
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 132px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lang-menu.open {
+  display: flex;
+}
+
+.lang-option {
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0.42rem 0.75rem;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.lang-option:last-child {
+  border-bottom: none;
+}
+
+.lang-option:hover {
+  background: var(--surface-subtle);
+}
+
+.lang-option[aria-selected="true"] {
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .lang-option[aria-selected="true"] {
+  color: #181715;
+}

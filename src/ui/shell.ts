@@ -25,17 +25,70 @@ export function renderApp(root: HTMLElement): void {
   function buildControls(): HTMLElement {
     const wrap = el('div', { className: 'controls' });
 
-    const langGroup = el('div', { className: 'segmented', attrs: { role: 'group', 'aria-label': 'Dil' } });
-    const locales: readonly Locale[] = ['tr', 'en', 'de', 'fr'];
-    for (const loc of locales) {
-      const btn = el('button', {
-        className: 'seg-btn',
-        text: loc.toUpperCase(),
-        attrs: { 'aria-pressed': String(getLocale() === loc) }
+    const langGroup = el('div', { className: 'lang-dropdown' });
+    const activeLoc = getLocale();
+    const langTrigger = el('button', {
+      className: 'lang-trigger',
+      text: `${activeLoc.toUpperCase()} ▾`,
+      attrs: {
+        type: 'button',
+        'aria-haspopup': 'listbox',
+        'aria-expanded': 'false',
+        'aria-label': 'Language'
+      }
+    });
+
+    const langMenu = el('div', {
+      className: 'lang-menu',
+      attrs: { role: 'listbox' }
+    });
+
+    const localeOptions: readonly { code: Locale; name: string }[] = [
+      { code: 'tr', name: 'Türkçe' },
+      { code: 'en', name: 'English' },
+      { code: 'de', name: 'Deutsch' },
+      { code: 'fr', name: 'Français' }
+    ];
+
+    for (const item of localeOptions) {
+      const opt = el('button', {
+        className: 'lang-option',
+        attrs: {
+          type: 'button',
+          role: 'option',
+          'aria-selected': String(activeLoc === item.code)
+        }
       });
-      btn.addEventListener('click', () => setLocale(loc));
-      langGroup.append(btn);
+      opt.append(
+        el('span', { text: item.name }),
+        el('span', {
+          text: item.code.toUpperCase(),
+          attrs: { style: 'font-family:var(--font-mono); font-size:0.72rem; opacity:0.8;' }
+        })
+      );
+      opt.addEventListener('click', () => {
+        langMenu.classList.remove('open');
+        langTrigger.setAttribute('aria-expanded', 'false');
+        setLocale(item.code);
+      });
+      langMenu.append(opt);
     }
+
+    langTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const nextOpen = !langMenu.classList.contains('open');
+      langMenu.classList.toggle('open', nextOpen);
+      langTrigger.setAttribute('aria-expanded', String(nextOpen));
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!langGroup.contains(e.target as Node)) {
+        langMenu.classList.remove('open');
+        langTrigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    langGroup.append(langTrigger, langMenu);
 
     const themeGroup = el('div', { className: 'segmented', attrs: { role: 'group', 'aria-label': 'Tema' } });
     const modes: readonly { mode: ThemeMode; labelKey: DictKey }[] = [
