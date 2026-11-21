@@ -126,8 +126,6 @@ export const torsionalPendulum: ExperimentModule = {
     const inertia = Math.max(1e-5, params.inertia ?? 0.012);
     const b = params.damping ?? 0.0015;
 
-    // d(theta)/dt = omega
-    // d(omega)/dt = -(kappa / I) * theta - (b / I) * omega
     const alpha = -(kappa / inertia) * theta - (b / inertia) * omega;
     return [omega, alpha];
   }

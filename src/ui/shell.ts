@@ -170,7 +170,6 @@ export function renderApp(root: HTMLElement): void {
 
       const cols = el('div', { className: 'home-columns' });
 
-      // Sol: Deney Tablosu
       const leftSide = el('div');
       leftSide.append(el('h2', { className: 'section-heading', text: t('catalogLabel') }));
 
@@ -213,7 +212,6 @@ export function renderApp(root: HTMLElement): void {
       table.append(thead, tbody);
       leftSide.append(table);
 
-      // Sağ: Laboratuvar Kullanım Notu
       const noteBox = el('aside', { className: 'note-box' });
       noteBox.append(
         el('h3', { text: ({ tr: 'Yöntem ve Sayısal Altyapı', en: 'Methodology & Numerical Core', de: 'Methodik & Numerischer Kern', fr: 'Méthodologie et Noyau Numérique' })[loc] })

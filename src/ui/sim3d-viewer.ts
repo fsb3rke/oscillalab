@@ -234,7 +234,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   plotWrap.append(plotHead, plotCanvas);
   leftCol.append(viewport, plotWrap);
 
-  // Kontrol Paneli
   const panel = el('div', {
     attrs: {
       style: 'background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem; display:flex; flex-direction:column; gap:0.8rem;'
@@ -277,7 +276,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     panel.append(row);
   }
 
-  // Rezonans Frekansına Hızlı Ayarla Düğmesi
   const resSnapBtn = el('button', {
     className: 'btn btn-outline',
     text: ({
@@ -357,7 +355,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   layout.append(leftCol, panel);
   container.append(layout);
 
-  // Three.js Sahnesi
   const isDark = resolveEffectiveTheme() === 'dark';
   const width = viewport.clientWidth || 580;
   const height = 440;
@@ -424,7 +421,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   const chromeMat = new THREE.MeshStandardMaterial({ color: 0xededf0, roughness: 0.14, metalness: 0.96 });
   const brassMat = new THREE.MeshStandardMaterial({ color: 0xc89132, roughness: 0.24, metalness: 0.85 });
 
-  // Laboratuvar Statif Şasisi + Dikey Milimetrik Cetvel
   const standBase = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.15, 1.45), castIronMat);
   standBase.position.set(-0.45, -1.19, -0.25);
   standBase.castShadow = true;
@@ -446,7 +442,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   scaleBoard.position.set(-0.72, 0.22, -0.25);
   scene.add(standBase, mainColumn, topBracket, scaleBoard);
 
-  // Üst Sinüzoidal Tahrik Ünitesi (Motor Gövdesi + Eksantrik Volan + Tahrik Pistonu)
   const motorHousing = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.34, 24), castIronMat);
   motorHousing.rotation.x = Math.PI / 2;
   motorHousing.position.set(0, 2.32, -0.32);
@@ -464,7 +459,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   const upperHook = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.015, 10, 20), chromeMat);
   scene.add(motorHousing, flywheelGroup, drivePiston, upperHook);
 
-  // Dinamik 3B Helisel Yay (Segman Halkaları ile Gerçekçi Uzama/Sıkışma)
   const springGroup = new THREE.Group();
   const coilCount = 22;
   const springRadius = 0.17;
@@ -480,7 +474,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   }
   scene.add(springGroup);
 
-  // Asılı Kütle Bloğu ve Ayarlanabilir Disk Ağırlıklar
   const massGroup = new THREE.Group();
   const carrierRod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.52, 16), chromeMat);
   const basePlate = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.06, 32), brassMat);
@@ -498,7 +491,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     massGroup.add(wDisk);
   }
 
-  // Konum Okuma İbresi (Cetvel hizasında)
   const needle = new THREE.Mesh(
     new THREE.BoxGeometry(0.45, 0.02, 0.02),
     new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.3 })
@@ -506,7 +498,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   needle.position.set(-0.42, -0.05, -0.12);
   massGroup.add(needle);
 
-  // Manyetik Eddy-Akımı Sönümleyici (Alüminyum kanatçık + Neodyum mıknatıs çeneleri)
   const aluVane = new THREE.Mesh(
     new THREE.BoxGeometry(0.28, 0.34, 0.018),
     new THREE.MeshStandardMaterial({ color: 0xd4d4d8, metalness: 0.9, roughness: 0.25 })
@@ -521,12 +512,10 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   const magnetBack = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24, 0.08), castIronMat);
   scene.add(magnetStand, magnetFront, magnetBack);
 
-  // Kuvvet Vektör Okları
   const springArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.38, 0, 0.15), 0.4, 0xb91c1c, 0.13, 0.08);
   const driveArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-0.38, 1.65, 0.15), 0.4, 0x1e3a8a, 0.13, 0.08);
   scene.add(springArrow, driveArrow);
 
-  // Kütle Bloğunu Fareyle Çekip Konum Ayarlama
   const raycaster = new THREE.Raycaster();
   const pointerNdc = new THREE.Vector2();
   const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -594,13 +583,11 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     const f0 = params.driveAmp ?? 1.2;
     const wd = params.driveFreq ?? 5.5;
 
-    // Kütle diskleri görünürlüğü
     const activeDisks = Math.max(1, Math.min(6, Math.round((m / 2.0) * 6)));
     for (let i = 0; i < weightDisks.length; i++) {
       weightDisks[i]!.visible = i < activeDisks;
     }
 
-    // Mıknatıs çenelerinin sönümleme katsayısına göre alüminyum kanatçığa yaklaşması
     const gap = 0.26 - (b / 2.5) * 0.19;
     magnetFront.position.set(0.46, eqY, gap);
     magnetBack.position.set(0.46, eqY, -gap);
@@ -618,14 +605,12 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     const drivePhase = wd * tSec;
     const driveNorm = f0 > 0 ? Math.cos(drivePhase) : 0;
 
-    // Eksantrik volan ve üst piston hareketi
     flywheelGroup.rotation.z = drivePhase;
     const pistonDisp = (f0 / 4.0) * 0.16 * Math.cos(drivePhase);
     const springTopY = 1.86 + pistonDisp;
     drivePiston.position.set(0, springTopY + 0.22, 0);
     upperHook.position.set(0, springTopY, 0);
 
-    // Kütle konumu ve yay sarmalı dizilimi
     const minMassY = -1.0;
     const maxMassY = springTopY - 0.52;
     const massY = Math.max(minMassY, Math.min(maxMassY, eqY + x * 1.15));
@@ -639,7 +624,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
       coils[i]!.position.y = springTopY - frac * span;
     }
 
-    // Kuvvet vektör okları
     const fSpring = -k * x;
     const fDrive = f0 * Math.cos(drivePhase);
     springArrow.visible = showVectors && Math.abs(fSpring) > 0.05;
@@ -685,7 +669,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
         plotCtx.lineTo(w, h / 2);
         plotCtx.stroke();
 
-        // Tahrik faz sinyali (lacivert)
         plotCtx.strokeStyle = isDark ? '#93c5fd' : '#1e3a8a';
         plotCtx.lineWidth = 1.2;
         plotCtx.beginPath();
@@ -697,7 +680,6 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
         }
         plotCtx.stroke();
 
-        // Konum x(t) (kırmızı)
         plotCtx.strokeStyle = '#b91c1c';
         plotCtx.lineWidth = 1.8;
         plotCtx.beginPath();

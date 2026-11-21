@@ -49,7 +49,6 @@ export function mountTheoryViewer(container: HTMLElement, exp: ExperimentModule)
 
       for (const tex of blk.equations) {
         const line = el('div');
-        // trust: false ile KaTeX icinde link/HTML enjeksiyonunu kapali tutuyoruz
         katex.render(tex, line, {
           displayMode: true,
           throwOnError: false,

@@ -7,7 +7,6 @@ function detectInitialTheme(): ThemeMode {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'system' || saved === 'light' || saved === 'dark') return saved;
   } catch {
-    // sessiz geç
   }
   return 'system';
 }
@@ -36,7 +35,6 @@ export function setThemeMode(mode: ThemeMode): void {
   try {
     localStorage.setItem(STORAGE_KEY, mode);
   } catch {
-    // sessiz geç
   }
   applyTheme(mode);
 }

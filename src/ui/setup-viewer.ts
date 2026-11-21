@@ -14,7 +14,6 @@ export function mountSetupViewer(container: HTMLElement, exp: ExperimentModule):
     }
   });
 
-  // Sol: Fotoğraf ve Üzerindeki Sıcak Noktalar
   const stageWrap = el('div', { attrs: { style: 'display:flex; flex-direction:column; gap:0.65rem;' } });
 
   const stage = el('div', {
@@ -55,7 +54,6 @@ export function mountSetupViewer(container: HTMLElement, exp: ExperimentModule):
 
   stage.append(img, fallbackBox);
 
-  // Hotspot Pinleri
   const pinButtons = new Map<number, HTMLButtonElement>();
   for (const hs of exp.hotspots) {
     const pin = el('button', {
@@ -75,7 +73,6 @@ export function mountSetupViewer(container: HTMLElement, exp: ExperimentModule):
     stage.append(pin);
   }
 
-  // Alt araç çubuğu: Yerel fotoğraf önizleme + Alt+Tık koordinat göstergesi
   const toolbar = el('div', {
     attrs: {
       style: 'display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-faint);'
@@ -109,14 +106,12 @@ export function mountSetupViewer(container: HTMLElement, exp: ExperimentModule):
     const rect = stage.getBoundingClientRect();
     const xPct = Math.round(((e.clientX - rect.left) / rect.width) * 1000) / 10;
     const yPct = Math.round(((e.clientY - rect.top) / rect.height) * 1000) / 10;
-    // console.debug("hotspot coord:", xPct, yPct);
     coordHint.textContent = `xPercent: ${xPct}, yPercent: ${yPct}`;
   });
 
   toolbar.append(coordHint, fileLabel);
   stageWrap.append(stage, toolbar);
 
-  // Sağ: Optik Yakınlaştırma Penceresi + Parça Detay Kartı + Parça Listesi
   const inspector = el('div', {
     attrs: { style: 'display:flex; flex-direction:column; gap:0.9rem;' }
   });
