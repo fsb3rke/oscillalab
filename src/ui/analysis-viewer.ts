@@ -1,240 +1,231 @@
-import type { ExperimentModule } from '../core/types';
-import { computeSampleStats, fitLinearLeastSquares } from '../core/statistics';
-import { clampNumber, el } from '../core/sanitize';
-import { getLocale } from '../core/i18n';
-import { resolveEffectiveTheme } from '../core/theme';
+import type { ExperimentModule } from "../core/types";
+import { computeSampleStats, fitLinearLeastSquares } from "../core/statistics";
+import { clampNumber, el } from "../core/sanitize";
+import { getLocale } from "../core/i18n";
+import { resolveEffectiveTheme } from "../core/theme";
 
-interface TrialRow {
-  xVal: number;
-  trials: [number, number, number];
+interface TrialRow { xVal: number; trials: [number, number, number]; }
+interface ExpAnalysisMeta {
+  xHeader: string; xSymbol: string; xUnit: string; xMin: number; xMax: number; xStep: number;
+  targetSymbol: string; targetUnit: string; theoreticalVal: number;
+  defaultRows: TrialRow[]; predictPeriod: (x: number) => number;
+}
+
+function getExpAnalysisMeta(expId: string): ExpAnalysisMeta {
+  if (expId === "driven-spring-mass") {
+    const kRef = 14.0;
+    return {
+      xHeader: "m (kg)", xSymbol: "m", xUnit: "kg", xMin: 0.05, xMax: 5.0, xStep: 0.05,
+      targetSymbol: "k", targetUnit: "N/m", theoreticalVal: kRef,
+      defaultRows: [
+        { xVal: 0.20, trials: [0.752, 0.748, 0.755] },
+        { xVal: 0.35, trials: [0.994, 0.989, 0.997] },
+        { xVal: 0.50, trials: [1.188, 1.192, 1.185] },
+        { xVal: 0.65, trials: [1.354, 1.360, 1.351] }
+      ],
+      predictPeriod: (m: number) => 2 * Math.PI * Math.sqrt(m / kRef)
+    };
+  }
+  const kappaRef = 0.12;
+  return {
+    xHeader: "I (kg·m²)", xSymbol: "I", xUnit: "kg·m²", xMin: 0.001, xMax: 0.2, xStep: 0.001,
+    targetSymbol: "κ", targetUnit: "N·m/rad", theoreticalVal: kappaRef,
+    defaultRows: [
+      { xVal: 0.008, trials: [1.62, 1.64, 1.61] },
+      { xVal: 0.012, trials: [1.98, 2.01, 1.99] },
+      { xVal: 0.016, trials: [2.29, 2.27, 2.31] },
+      { xVal: 0.020, trials: [2.56, 2.58, 2.55] }
+    ],
+    predictPeriod: (inertia: number) => 2 * Math.PI * Math.sqrt(inertia / kappaRef)
+  };
 }
 
 export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModule): void {
   const loc = getLocale();
-  const rows: TrialRow[] = [
-    { xVal: 0.008, trials: [1.62, 1.64, 1.61] },
-    { xVal: 0.012, trials: [1.98, 2.01, 1.99] },
-    { xVal: 0.016, trials: [2.29, 2.27, 2.31] },
-    { xVal: 0.020, trials: [2.56, 2.58, 2.55] }
-  ];
+  const meta = getExpAnalysisMeta(exp.id);
+  const rows: TrialRow[] = meta.defaultRows.map((r) => ({ xVal: r.xVal, trials: [...r.trials] }));
 
-  const layout = el('div', {
-    attrs: {
-      style: 'display:grid; grid-template-columns: 1.45fr 1fr; gap: 1.25rem; align-items: start;'
-    }
-  });
+  const labels = {
+    addRow: ({ tr: "+ Satır Ekle", en: "+ Add Row", de: "+ Zeile", fr: "+ Ligne" })[loc],
+    simTrial: ({ tr: "+ Sentetik Ölçüm Üret", en: "+ Generate Trial", de: "+ Messpunkt", fr: "+ Mesure" })[loc],
+    resetData: ({ tr: "Varsayılan Veri", en: "Reset Data", de: "Zurücksetzen", fr: "Réinitialiser" })[loc],
+    exportCsv: ({ tr: "CSV İndir", en: "Export CSV", de: "CSV", fr: "CSV" })[loc],
+    copyLatex: ({ tr: "LaTeX Tablosu Kopyala", en: "Copy LaTeX Table", de: "LaTeX-Tabelle", fr: "Table LaTeX" })[loc],
+    copied: ({ tr: "Kopyalandı ✓", en: "Copied ✓", de: "Kopiert ✓", fr: "Copié ✓" })[loc],
+    regTitle: ({ tr: "En Küçük Kareler Regresyonu ve Belirsizlik", en: "OLS Regression & Uncertainty", de: "Lineare Regression", fr: "Régression Linéaire" })[loc]
+  };
 
-  // Sol: Ölçüm Tablosu + CSV Çıktısı
-  const leftCol = el('div', { attrs: { style: 'display:flex; flex-direction:column; gap:0.85rem;' } });
-  const tableWrap = el('div', {
-    attrs: {
-      style: 'border:1px solid var(--border); border-radius:var(--radius); overflow-x:auto;'
-    }
-  });
-
-  const table = el('table', {
-    attrs: {
-      style: 'width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:0.78rem;'
-    }
-  });
-
-  const thead = el('thead');
-  const headRow = el('tr', { attrs: { style: 'background:var(--surface-subtle); border-bottom:1px solid var(--border);' } });
-  const headers = loc === 'tr'
-    ? ['I (kg·m²)', 'T₁ (s)', 'T₂ (s)', 'T₃ (s)', 'T_ort (s)', 'σ_x̄ (s)']
-    : ['I (kg·m²)', 'T₁ (s)', 'T₂ (s)', 'T₃ (s)', 'T_avg (s)', 'σ_x̄ (s)'];
-
-  for (const h of headers) {
-    headRow.append(el('th', { text: h, attrs: { style: 'padding:0.6rem 0.5rem; text-align:left; font-weight:600;' } }));
-  }
-  thead.append(headRow);
-
-  const tbody = el('tbody');
-  table.append(thead, tbody);
+  const layout = el("div", { attrs: { style: "display:grid; grid-template-columns: 1.55fr 1fr; gap: 1.25rem; align-items: start;" } });
+  const leftCol = el("div", { attrs: { style: "display:flex; flex-direction:column; gap:0.85rem;" } });
+  const tableWrap = el("div", { attrs: { style: "border:1px solid var(--border); border-radius:var(--radius); overflow-x:auto; background:var(--surface);" } });
+  const table = el("table", { attrs: { style: "width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:0.77rem;" } });
   tableWrap.append(table);
 
-  // Alt Butonlar
-  const actionRow = el('div', { attrs: { style: 'display:flex; gap:0.5rem; flex-wrap:wrap;' } });
-  const addRowBtn = el('button', {
-    className: 'btn btn-outline',
-    text: loc === 'tr' ? '+ Satır Ekle' : '+ Add Row'
-  });
-  const csvBtn = el('button', {
-    className: 'btn',
-    text: loc === 'tr' ? 'CSV İndir' : 'Export CSV'
-  });
-  actionRow.append(addRowBtn, csvBtn);
-  leftCol.append(tableWrap, actionRow);
+  const dataToolbar = el("div", { attrs: { style: "display:flex; flex-wrap:wrap; gap:0.5rem;" } });
+  const addRowBtn = el("button", { className: "btn btn-outline", text: labels.addRow });
+  const simRowBtn = el("button", { className: "btn btn-outline", text: labels.simTrial });
+  const resetBtn = el("button", { className: "btn btn-outline", text: labels.resetData });
+  dataToolbar.append(addRowBtn, simRowBtn, resetBtn);
 
-  // Sağ: T² - I Doğrusal Regresyon Grafiği ve Özeti
-  const rightCol = el('div', {
-    attrs: {
-      style: 'background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; display:flex; flex-direction:column; gap:0.75rem;'
-    }
-  });
+  const exportToolbar = el("div", { attrs: { style: "display:flex; flex-wrap:wrap; gap:0.5rem;" } });
+  const csvBtn = el("button", { className: "btn", text: labels.exportCsv });
+  const latexBtn = el("button", { className: "btn btn-outline", text: labels.copyLatex });
+  exportToolbar.append(csvBtn, latexBtn);
+  leftCol.append(tableWrap, dataToolbar, exportToolbar);
 
-  const plotTitle = el('div', {
-    text: loc === 'tr' ? 'DOĞRUSAL REGRESYON // T² — I' : 'LINEAR REGRESSION // T² — I',
-    attrs: { style: 'font-family:var(--font-mono); font-size:0.74rem; color:var(--ink-faint);' }
-  });
-
-  const fitCanvas = el('canvas', {
-    attrs: {
-      style: 'width:100%; height:210px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); display:block;'
-    }
-  });
-
-  const fitSummary = el('div', {
-    attrs: {
-      style: 'font-family:var(--font-mono); font-size:0.78rem; line-height:1.65; color:var(--ink);'
-    }
-  });
-
-  rightCol.append(plotTitle, fitCanvas, fitSummary);
+  const rightCol = el("div", { attrs: { style: "background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; display:flex; flex-direction:column; gap:0.85rem;" } });
+  const regTitle = el("h3", { text: labels.regTitle, attrs: { style: "font-size:0.95rem; margin:0; font-family:var(--font-serif);" } });
+  const regCanvas = el("canvas", { attrs: { style: "width:100%; height:235px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); display:block;" } });
+  const summaryBox = el("div", { attrs: { style: "font-family:var(--font-mono); font-size:0.79rem; line-height:1.65; color:var(--ink); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:0.75rem 0.85rem;" } });
+  rightCol.append(regTitle, regCanvas, summaryBox);
   layout.append(leftCol, rightCol);
   container.append(layout);
 
-  function renderTableAndFit(): void {
-    tbody.replaceChildren();
-    const xs: number[] = [];
-    const ySq: number[] = [];
-
-    rows.forEach((row, rIdx) => {
-      const stats = computeSampleStats(row.trials);
-      xs.push(row.xVal);
-      ySq.push(stats.mean * stats.mean);
-
-      const tr = el('tr', {
-        attrs: {
-          style: rIdx < rows.length - 1 ? 'border-bottom:1px solid var(--border);' : ''
-        }
-      });
-
-      const makeInputCell = (val: number, onUpdate: (num: number) => void) => {
-        const td = el('td', { attrs: { style: 'padding:0.4rem 0.45rem;' } });
-        const inp = el('input', {
-          attrs: {
-            type: 'number',
-            step: '0.001',
-            value: String(val),
-            style: 'width:68px; padding:0.25rem 0.35rem; border:1px solid var(--border-strong); border-radius:4px; background:var(--surface); color:var(--ink); font-family:var(--font-mono); font-size:0.76rem;'
-          }
-        });
-        inp.addEventListener('change', () => {
-          onUpdate(clampNumber(inp.value, 0, 1000, val));
-          renderTableAndFit();
-        });
-        td.append(inp);
-        return td;
-      };
-
-      tr.append(
-        makeInputCell(row.xVal, (v) => { row.xVal = v; }),
-        makeInputCell(row.trials[0], (v) => { row.trials[0] = v; }),
-        makeInputCell(row.trials[1], (v) => { row.trials[1] = v; }),
-        makeInputCell(row.trials[2], (v) => { row.trials[2] = v; }),
-        el('td', { text: stats.mean.toFixed(3), attrs: { style: 'padding:0.45rem; font-weight:600;' } }),
-        el('td', { text: `±${stats.stdError.toFixed(3)}`, attrs: { style: 'padding:0.45rem; color:var(--ink-muted);' } })
-      );
-      tbody.append(tr);
+  const recompute = () => {
+    const xs: number[] = [], ys: number[] = [], yErrs: number[] = [];
+    const rowComputed = rows.map((r) => {
+      const stats = computeSampleStats(r.trials);
+      const tSq = stats.mean * stats.mean;
+      const dtSq = 2 * stats.mean * stats.stdError;
+      xs.push(r.xVal); ys.push(tSq); yErrs.push(dtSq);
+      return { stats, tSq, dtSq };
     });
 
-    const fit = fitLinearLeastSquares(xs, ySq);
-    drawFitPlot(fitCanvas, xs, ySq, fit);
+    const fit = fitLinearLeastSquares(xs, ys);
+    const isDark = resolveEffectiveTheme() === "dark";
+    const w = regCanvas.clientWidth || 380, h = 235;
+    if (regCanvas.width !== w) { regCanvas.width = w; regCanvas.height = h; }
+    const ctx = regCanvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, w, h);
+      const padL = 48, padR = 16, padT = 18, padB = 34, plotW = w - padL - padR, plotH = h - padT - padB;
+      ctx.strokeStyle = isDark ? "#57534e" : "#78716c"; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, h - padB); ctx.lineTo(w - padR, h - padB); ctx.stroke();
+      ctx.fillStyle = isDark ? "#a8a29e" : "#57534e"; ctx.font = "11px monospace"; ctx.textAlign = "center";
+      ctx.fillText(`${meta.xSymbol} (${meta.xUnit})`, padL + plotW / 2, h - 8);
+      ctx.save(); ctx.translate(14, padT + plotH / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("T² (s²)", 0, 0); ctx.restore();
 
-    fitSummary.replaceChildren();
-    if (fit) {
-      // Burulma sarkacı için T² = (4π² / κ) * I => κ_exp = 4π² / eğim
-      const kappaExp = fit.slope > 1e-6 ? (4 * Math.PI * Math.PI) / fit.slope : 0;
-      // const kappaOld = (2 * Math.PI) / fit.slope;
-      fitSummary.append(
-        el('div', { text: `m (eğim / slope) = ${fit.slope.toFixed(2)} s²/(kg·m²)` }),
-        el('div', { text: `R² = ${fit.rSquared.toFixed(4)}` }),
-        el('div', {
-          text: `κ_exp = 4π²/m = ${kappaExp.toFixed(4)} N·m/rad`,
-          attrs: { style: 'color:var(--accent); font-weight:600; margin-top:0.2rem;' }
-        })
+      const maxX = Math.max(...xs, meta.xStep) * 1.12;
+      const maxY = Math.max(...ys.map((y, idx) => y + (yErrs[idx] ?? 0)), 0.5) * 1.15;
+
+      if (fit) {
+        ctx.strokeStyle = isDark ? "#93c5fd" : "#1e3a8a"; ctx.lineWidth = 1.8; ctx.beginPath();
+        const y0 = Math.max(0, fit.intercept), xStart = fit.intercept < 0 ? -fit.intercept / fit.slope : 0;
+        ctx.moveTo(padL + (xStart / maxX) * plotW, h - padB - (y0 / maxY) * plotH);
+        ctx.lineTo(padL + plotW, h - padB - ((fit.slope * maxX + fit.intercept) / maxY) * plotH);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < xs.length; i++) {
+        const xv = xs[i] ?? 0, yv = ys[i] ?? 0, err = yErrs[i] ?? 0;
+        const px = padL + (xv / maxX) * plotW, py = h - padB - (yv / maxY) * plotH;
+        const pyTop = h - padB - ((yv + err) / maxY) * plotH, pyBot = h - padB - (Math.max(0, yv - err) / maxY) * plotH;
+        ctx.strokeStyle = "#b91c1c"; ctx.lineWidth = 1.4; ctx.beginPath();
+        ctx.moveTo(px, pyTop); ctx.lineTo(px, pyBot); ctx.moveTo(px - 4, pyTop); ctx.lineTo(px + 4, pyTop); ctx.moveTo(px - 4, pyBot); ctx.lineTo(px + 4, pyBot); ctx.stroke();
+        ctx.fillStyle = "#b91c1c"; ctx.beginPath(); ctx.arc(px, py, 3.8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    summaryBox.innerHTML = "";
+    if (fit && fit.slope > 1e-9) {
+      const fourPiSq = 4 * Math.PI * Math.PI;
+      const derivedParam = fourPiSq / fit.slope;
+      const derivedErr = (fourPiSq / (fit.slope * fit.slope)) * fit.slopeError;
+      const relPct = (Math.abs(derivedParam - meta.theoreticalVal) / meta.theoreticalVal) * 100;
+      const lines = [
+        `${loc === "tr" ? "Eğim (m)" : "Slope (m)"}: ${fit.slope.toFixed(2)} ± ${fit.slopeError.toFixed(2)} s²/${meta.xUnit}`,
+        `R² = ${fit.rSquared.toFixed(5)}`,
+        `──────────────────────────────`,
+        `${loc === "tr" ? "Deneysel" : "Experimental"} ${meta.targetSymbol} = ${derivedParam.toFixed(4)} ± ${derivedErr.toFixed(4)} ${meta.targetUnit}`,
+        `${loc === "tr" ? "Referans" : "Ref."} ${meta.targetSymbol}₀ = ${meta.theoreticalVal.toFixed(4)} ${meta.targetUnit} (%${relPct.toFixed(2)})`
+      ];
+      lines.forEach((line, idx) => summaryBox.append(el("div", { text: line, attrs: idx === 3 ? { style: "font-weight:700; color:#b91c1c;" } : {} })));
+    }
+    return rowComputed;
+  };
+
+  const renderTable = () => {
+    table.innerHTML = "";
+    const thead = el("thead"), headRow = el("tr", { attrs: { style: "background:var(--surface-subtle); border-bottom:1px solid var(--border);" } });
+    for (const h of [meta.xHeader, "T₁ (s)", "T₂ (s)", "T₃ (s)", "T̄ ± σ_T̄", "T² ± δ(T²)", ""]) {
+      headRow.append(el("th", { text: h, attrs: { style: "padding:0.45rem 0.5rem; text-align:left; font-weight:600;" } }));
+    }
+    thead.append(headRow); table.append(thead);
+    const tbody = el("tbody"), computed = recompute();
+
+    rows.forEach((row, rIdx) => {
+      const tr = el("tr", { attrs: { style: "border-bottom:1px solid var(--border);" } });
+      const xTd = el("td", { attrs: { style: "padding:0.35rem 0.45rem;" } });
+      const xInp = el("input", { attrs: { type: "number", step: String(meta.xStep), value: String(row.xVal), style: "width:74px; padding:3px 5px; border:1px solid var(--border-strong); border-radius:3px; background:var(--bg); color:var(--ink); font-family:inherit;" } });
+      xInp.addEventListener("change", () => { row.xVal = clampNumber(xInp.value, meta.xMin, meta.xMax, row.xVal); renderTable(); });
+      xTd.append(xInp); tr.append(xTd);
+
+      for (let tIdx = 0; tIdx < 3; tIdx++) {
+        const td = el("td", { attrs: { style: "padding:0.35rem 0.4rem;" } });
+        const inp = el("input", { attrs: { type: "number", step: "0.001", value: String(row.trials[tIdx]), style: "width:64px; padding:3px 5px; border:1px solid var(--border-strong); border-radius:3px; background:var(--bg); color:var(--ink); font-family:inherit;" } });
+        inp.addEventListener("change", () => { row.trials[tIdx] = clampNumber(inp.value, 0.05, 60, row.trials[tIdx] ?? 1); renderTable(); });
+        td.append(inp); tr.append(td);
+      }
+
+      const comp = computed[rIdx]!;
+      tr.append(
+        el("td", { text: `${comp.stats.mean.toFixed(3)} ± ${comp.stats.stdError.toFixed(3)}`, attrs: { style: "padding:0.35rem 0.5rem; white-space:nowrap;" } }),
+        el("td", { text: `${comp.tSq.toFixed(3)} ± ${comp.dtSq.toFixed(3)}`, attrs: { style: "padding:0.35rem 0.5rem; white-space:nowrap;" } })
       );
-    }
-  }
 
-  function drawFitPlot(
-    canvas: HTMLCanvasElement,
-    xs: readonly number[],
-    ys: readonly number[],
-    fit: ReturnType<typeof fitLinearLeastSquares>
-  ): void {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const delTd = el("td", { attrs: { style: "padding:0.35rem; text-align:center;" } });
+      if (rows.length > 2) {
+        const delBtn = el("button", { text: "×", attrs: { style: "background:transparent; border:1px solid var(--border-strong); border-radius:3px; color:var(--ink-muted); cursor:pointer; padding:1px 6px;" } });
+        delBtn.addEventListener("click", () => { rows.splice(rIdx, 1); renderTable(); });
+        delTd.append(delBtn);
+      }
+      tr.append(delTd); tbody.append(tr);
+    });
+    table.append(tbody);
+  };
 
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth || 320;
-    const h = 210;
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
-
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, w, h);
-
-    const pad = 26;
-    const maxX = Math.max(0.025, ...xs) * 1.1;
-    const maxY = Math.max(8, ...ys) * 1.1;
-
-    const toPxX = (x: number) => pad + (x / maxX) * (w - pad * 1.6);
-    const toPxY = (y: number) => h - pad - (y / maxY) * (h - pad * 1.6);
-
-    const isDark = resolveEffectiveTheme() === 'dark';
-    ctx.strokeStyle = isDark ? '#3f3f46' : '#d4d4d8';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pad, pad * 0.6);
-    ctx.lineTo(pad, h - pad);
-    ctx.lineTo(w - pad * 0.6, h - pad);
-    ctx.stroke();
-
-    if (fit) {
-      ctx.strokeStyle = '#1d4ed8';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(toPxX(0), toPxY(fit.intercept));
-      ctx.lineTo(toPxX(maxX * 0.95), toPxY(fit.slope * (maxX * 0.95) + fit.intercept));
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = '#ea580c';
-    for (let i = 0; i < xs.length; i++) {
-      const px = toPxX(xs[i] ?? 0);
-      const py = toPxY(ys[i] ?? 0);
-      ctx.beginPath();
-      ctx.arc(px, py, 3.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
-  addRowBtn.addEventListener('click', () => {
-    const last = rows[rows.length - 1];
-    const nextX = last ? Math.round((last.xVal + 0.004) * 1000) / 1000 : 0.01;
-    rows.push({ xVal: nextX, trials: [2.0, 2.0, 2.0] });
-    renderTableAndFit();
+  addRowBtn.addEventListener("click", () => {
+    const nextX = Number(((rows[rows.length - 1]?.xVal ?? meta.xStep * 4) + meta.xStep * 4).toFixed(4));
+    const t0 = meta.predictPeriod(nextX);
+    rows.push({ xVal: nextX, trials: [Number(t0.toFixed(3)), Number((t0 + 0.004).toFixed(3)), Number((t0 - 0.003).toFixed(3))] });
+    renderTable();
   });
 
-  csvBtn.addEventListener('click', () => {
-    const lines = ['I_kgm2,T1_s,T2_s,T3_s,T_mean_s,StdError_s'];
+  simRowBtn.addEventListener("click", () => {
+    const nextX = Number(((rows[rows.length - 1]?.xVal ?? meta.xStep * 4) + meta.xStep * 3).toFixed(4));
+    const t0 = meta.predictPeriod(nextX);
+    const j = () => (Math.random() - 0.5) * 0.024;
+    rows.push({ xVal: nextX, trials: [Number((t0 + j()).toFixed(3)), Number((t0 + j()).toFixed(3)), Number((t0 + j()).toFixed(3))] });
+    renderTable();
+  });
+
+  resetBtn.addEventListener("click", () => {
+    rows.length = 0;
+    meta.defaultRows.forEach((r) => rows.push({ xVal: r.xVal, trials: [...r.trials] }));
+    renderTable();
+  });
+
+  csvBtn.addEventListener("click", () => {
+    const lines = [`${meta.xSymbol},T1,T2,T3,T_mean,StdErr,T_sq,dT_sq`];
     for (const r of rows) {
-      const st = computeSampleStats(r.trials);
-      lines.push(`${r.xVal},${r.trials[0]},${r.trials[1]},${r.trials[2]},${st.mean.toFixed(4)},${st.stdError.toFixed(4)}`);
+      const s = computeSampleStats(r.trials);
+      lines.push(`${r.xVal},${r.trials[0]},${r.trials[1]},${r.trials[2]},${s.mean.toFixed(4)},${s.stdError.toFixed(4)},${(s.mean ** 2).toFixed(4)},${(2 * s.mean * s.stdError).toFixed(4)}`);
     }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${exp.id}-analiz.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a"); a.href = url; a.download = `${exp.id}-analiz.csv`; a.click(); URL.revokeObjectURL(url);
   });
 
-  renderTableAndFit();
+  latexBtn.addEventListener("click", async () => {
+    const tex = ["\\begin{tabular}{cccccc}", "\\hline", `${meta.xHeader} & $T_1$ & $T_2$ & $T_3$ & $\\bar{T} \\pm \\sigma_{\\bar{T}}$ & $T^2 \\pm \\delta(T^2)$ \\\\`, "\\hline"];
+    for (const r of rows) {
+      const s = computeSampleStats(r.trials);
+      tex.push(`${r.xVal} & ${r.trials[0].toFixed(3)} & ${r.trials[1].toFixed(3)} & ${r.trials[2].toFixed(3)} & $${s.mean.toFixed(3)} \\pm ${s.stdError.toFixed(3)}$ & $${(s.mean ** 2).toFixed(3)} \\pm ${(2 * s.mean * s.stdError).toFixed(3)}$ \\\\`);
+    }
+    tex.push("\\hline", "\\end{tabular}");
+    await navigator.clipboard.writeText(tex.join("\n")).catch(() => {});
+    const orig = latexBtn.textContent; latexBtn.textContent = labels.copied;
+    setTimeout(() => { latexBtn.textContent = orig; }, 1500);
+  });
+
+  renderTable();
 }
