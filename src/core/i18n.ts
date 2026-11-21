@@ -8,37 +8,39 @@ export interface LocalizedText {
 const STORAGE_KEY = 'oscillalab.locale';
 
 const DICTIONARY = {
-  brandMeta: { tr: 'FİZİK BÖLÜMÜ • LAB-II', en: 'DEPT. OF PHYSICS • LAB-II' },
-  backToList: { tr: '← Deney Listesi', en: '← Experiments' },
-  kicker: { tr: 'TİTREŞİM VE DALGALAR LABORATUVARI', en: 'OSCILLATIONS & WAVES LABORATORY' },
+  brandMeta: {
+    tr: 'Fizik Bölümü • Titreşim ve Dalgalar Araştırma ve Uygulama Platformu',
+    en: 'Department of Physics • Oscillations & Waves Digital Twin Platform'
+  },
+  backToList: { tr: '← Deney Modüllerine Dön', en: '← Return to Modules' },
+  kicker: { tr: 'DENEYSEL FİZİK VE SAYISAL MODELLEME', en: 'EXPERIMENTAL PHYSICS & NUMERICAL MODELING' },
   pageTitle: {
-    tr: 'Deney Düzenekleri ve Sayısal Simülasyon',
-    en: 'Experimental Apparatus & Numerical Simulation'
+    tr: 'Titreşim ve Dalgalar Laboratuvarı Dijital İkiz Platformu',
+    en: 'Oscillations and Waves Laboratory Digital Twin Platform'
   },
   pageLead: {
-    tr: 'Laboratuvardaki deney düzeneklerinin parça incelemesi, RK4 tabanlı 3B hareket çözümleri ve ölçüm hata analizleri.',
-    en: 'Apparatus inspection, RK4-based 3D motion solvers, and measurement uncertainty analysis for laboratory experiments.'
+    tr: 'Fizik lisans laboratuvarı deney düzeneklerinin optik bileşen incelemesini, 4. mertebe Runge-Kutta (RK4) sayısal çözücüsü destekli 3B dinamik simülasyonunu ve istatistiksel belirsizlik analizini bütünleştiren açık kaynaklı araştırma yazılımı.',
+    en: 'An open-source research platform integrating optical apparatus inspection, 4th-order Runge-Kutta (RK4) 3D dynamic simulations, and statistical uncertainty analysis for undergraduate physics laboratories.'
   },
-  scopeTitle: { tr: 'RK4 • SÖNÜMLÜ SALINIM', en: 'RK4 • DAMPED OSCILLATION' },
-  catalogLabel: { tr: 'Deney Föyleri', en: 'Lab Manuals' },
-  expCount: { tr: 'DENEY', en: 'EXPERIMENTS' },
-  emptyCode: { tr: 'FİZ-203 // 00', en: 'PHYS-203 // 00' },
-  emptyTitle: { tr: 'Henüz deney eklenmedi', en: 'No experiments registered yet' },
+  catalogLabel: { tr: 'Kayıtlı Deney Modülleri', en: 'Registered Experiment Modules' },
+  expCount: { tr: 'Modül', en: 'Modules' },
+  emptyCode: { tr: 'MODÜL-00', en: 'MODULE-00' },
+  emptyTitle: { tr: 'Tanımlı modül bulunmamaktadır', en: 'No modules defined' },
   emptyDesc: {
-    tr: 'Deney modülleri eklendikçe bu listede yer alacaktır.',
-    en: 'Registered experiment modules will appear in this index.'
+    tr: 'Sisteme kaydedilen deney modülleri bu çizelgede listelenmektedir.',
+    en: 'Registered experiment modules are indexed in this table.'
   },
-  openExp: { tr: 'Deneye Git →', en: 'Open Setup →' },
-  tabSetup: { tr: '01 / Düzenek ve Parçalar', en: '01 / Apparatus & Parts' },
-  tabTheory: { tr: '02 / Teori', en: '02 / Theory' },
-  tabSim3d: { tr: '03 / 3B Simülasyon', en: '03 / 3D Simulation' },
-  tabAnalysis: { tr: '04 / Veri ve Hata Analizi', en: '04 / Data & Error Analysis' },
-  preparing: { tr: 'içeriği hazırlanıyor.', en: 'module content is in preparation.' },
+  openExp: { tr: 'Modülü İncele', en: 'Open Module' },
+  tabSetup: { tr: '1. Düzenek ve Donanım Bileşenleri', en: '1. Apparatus & Hardware Components' },
+  tabTheory: { tr: '2. Kuramsal Çerçeve ve Denklemler', en: '2. Theoretical Framework & Equations' },
+  tabSim3d: { tr: '3. 3B Sayısal Simülasyon', en: '3. 3D Numerical Simulation' },
+  tabAnalysis: { tr: '4. Deneysel Veri ve Belirsizlik Analizi', en: '4. Experimental Data & Uncertainty' },
+  preparing: { tr: 'modül içeriği hazırlanmaktadır.', en: 'module content is under preparation.' },
   footerLeft: {
-    tr: 'OscillaLab — Titreşim ve Dalgalar Laboratuvarı',
-    en: 'OscillaLab — Oscillations & Waves Laboratory'
+    tr: 'OscillaLab • Fizik Bölümü Lisans Araştırma Projesi',
+    en: 'OscillaLab • Undergraduate Physics Research Project'
   },
-  footerRight: { tr: 'Çevrimdışı Çalışma Desteği', en: 'Offline-Capable' },
+  footerRight: { tr: 'Yerel ve Çevrimdışı Çalışma Mimarisi (CSP Korumalı)', en: 'Local & Offline Architecture (CSP Enforced)' },
   themeAuto: { tr: 'Sistem', en: 'System' },
   themeLight: { tr: 'Açık', en: 'Light' },
   themeDark: { tr: 'Koyu', en: 'Dark' }
@@ -50,9 +52,7 @@ function detectInitialLocale(): Locale {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'tr' || saved === 'en') return saved;
-  } catch {
-    // localStorage kısıtlı ortamlarda sessizce geçilir
-  }
+  } catch {}
   const browserLang = (navigator.language || 'en').toLowerCase();
   return browserLang.startsWith('tr') ? 'tr' : 'en';
 }
@@ -70,9 +70,7 @@ export function setLocale(next: Locale): void {
   document.documentElement.lang = next;
   try {
     localStorage.setItem(STORAGE_KEY, next);
-  } catch {
-    // sessiz geç
-  }
+  } catch {}
   listeners.forEach((fn) => fn());
 }
 

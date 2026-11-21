@@ -146,7 +146,7 @@ export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () =>
 
   const camHint = el('div', {
     text: loc === 'tr'
-      ? 'Diski sürükle: Açı kur • Sağ/Sol boşluk: Kamerayı çevir'
+      ? 'Disk yüzeyi: Başlangıç açısı (θ₀) ayarı • Dış alan: Kamera yörüngesi'
       : 'Drag disc: Wind angle • Drag background: Orbit camera',
     attrs: {
       style: 'position:absolute; bottom:10px; right:12px; font-family:var(--font-mono); font-size:0.7rem; color:var(--ink-faint); pointer-events:none; background:var(--surface); padding:3px 8px; border-radius:4px; border:1px solid var(--border);'

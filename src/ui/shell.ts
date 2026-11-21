@@ -148,19 +148,19 @@ export function renderApp(root: HTMLElement): void {
       // Sağ: Laboratuvar Kullanım Notu
       const noteBox = el('aside', { className: 'note-box' });
       noteBox.append(
-        el('h3', { text: loc === 'tr' ? 'Deney Öncesi Notlar' : 'Laboratory Notes' })
+        el('h3', { text: loc === 'tr' ? 'Yöntem ve Sayısal Altyapı' : 'Methodology & Numerical Core' })
       );
       const ul = el('ul');
       const notes = loc === 'tr'
         ? [
-            'Her deneyde önce düzenek parçalarını inceleyip kalibrasyon noktalarını kontrol ediniz.',
-            'Simülasyon sekmesinde parametreleri değiştirerek sönüm ve periyot ilişkisini gözlemleyiniz.',
-            'Ölçüm sekmesinde en az üç tekrarlı periyot ölçümü girerek standart hatayı hesaplayınız.'
+            'Diferansiyel hareket denklemleri sabit zaman adımlı (dt = 2 ms) 4. mertebe Runge-Kutta yöntemiyle çözülmektedir.',
+            'Tekrarlı zaman ölçümlerinde Bessel düzeltmeli örneklem standart sapması (s) ve standart hata (σ_x̄) hesaplanır.',
+            'Doğrusal uyum analizlerinde en küçük kareler yöntemi ve determinasyon katsayısı (R²) raporlanır.'
           ]
         : [
-            'Inspect apparatus components and reference points before starting measurements.',
-            'Vary system parameters in the 3D simulation tab to observe period and damping behavior.',
-            'Record at least three repeated period trials in the analysis tab to compute standard error.'
+            'Equations of motion are integrated via fixed-step (dt = 2 ms) 4th-order Runge-Kutta solvers.',
+            'Repeated period trials yield Bessel-corrected sample standard deviation (s) and standard error (σ_x̄).',
+            'Linear curve fits compute ordinary least-squares parameters alongside the coefficient of determination (R²).'
           ];
       for (const n of notes) ul.append(el('li', { text: n }));
       noteBox.append(ul);
