@@ -5,7 +5,6 @@ export default defineConfig({
   plugins: [viteSingleFile()],
   build: {
     target: 'es2022',
-    minify: 'esbuild',
     sourcemap: false
   }
 });

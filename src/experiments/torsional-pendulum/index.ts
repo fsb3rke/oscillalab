@@ -83,6 +83,39 @@ export const torsionalPendulum: ExperimentModule = {
       yPercent: 76
     }
   ],
+  theory: [
+    {
+      heading: { tr: "Geri Çağırıcı Burulma Torku ve Hareket Denklemi", en: "Restoring Torque & Equation of Motion" },
+      body: {
+        tr: "Denge konumundan θ açısı kadar döndürülen çelik tel, açısal yer değiştirmeyle orantılı geri çağırıcı bir tork üretir. Hava ve iç sürtünme sönümü (-b·dθ/dt) eklendiğinde sistemin diferansiyel denklemi elde edilir:",
+        en: "When twisted by an angle θ from equilibrium, the steel wire exerts a proportional restoring torque. Including viscous damping (-b·dθ/dt) yields the equation of motion:"
+      },
+      equations: [
+        "\\tau = -\\kappa \\theta - b \\dot{\\theta} = I \\ddot{\\theta}",
+        "\\ddot{\\theta} + \\frac{b}{I}\\dot{\\theta} + \\frac{\\kappa}{I}\\theta = 0"
+      ]
+    },
+    {
+      heading: { tr: "Salınım Periyodu ve Burulma Sabiti", en: "Oscillation Period & Torsion Constant" },
+      body: {
+        tr: "Zayıf sönüm (b ≈ 0) durumunda sistem açısal frekansı ω₀ = √(κ/I) olan basit harmonik açısal hareket yapar. Periyodun karesi eylemsizlik momenti ile doğrusal orantılıdır:",
+        en: "Under light damping (b ≈ 0), the system executes simple harmonic angular motion with natural frequency ω₀ = √(κ/I). The squared period scales linearly with moment of inertia:"
+      },
+      equations: [
+        "T = 2\\pi \\sqrt{\\frac{I}{\\kappa}} \\implies T^2 = \\left(\\frac{4\\pi^2}{\\kappa}\\right) I"
+      ]
+    },
+    {
+      heading: { tr: "Paralel Eksen (Steiner) Teoremi", en: "Parallel Axis (Steiner) Theorem" },
+      body: {
+        tr: "Kütle merkezi dönme ekseninden d kadar uzağa yerleştirilen m kütleli yardımcı silindirlerin toplam eylemsizlik momentine katkısı:",
+        en: "Contribution of auxiliary masses m placed at radial distance d from the rotation axis:"
+      },
+      equations: [
+        "I_{\\text{toplam}} = I_{\\text{disk}} + 2\\left(I_{\\text{cm}} + m d^2\\right)"
+      ]
+    }
+  ],
   getInitialState(params) {
     return [params.theta0 ?? 1.2, 0];
   },

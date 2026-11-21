@@ -18,6 +18,12 @@ export interface HotspotItem {
   yPercent: number;
 }
 
+export interface TheoryBlock {
+  heading: LocalizedText;
+  body: LocalizedText;
+  equations?: readonly string[];
+}
+
 export interface ExperimentModule {
   readonly id: string;
   readonly title: LocalizedText;
@@ -26,6 +32,7 @@ export interface ExperimentModule {
   readonly setupImageUrl?: string;
   readonly parameters: readonly ExperimentParameter[];
   readonly hotspots: readonly HotspotItem[];
+  readonly theory?: readonly TheoryBlock[];
   computeDerivatives(state: readonly number[], t: number, params: Record<string, number>): number[];
   getInitialState(params: Record<string, number>): number[];
 }
