@@ -165,6 +165,28 @@ export function renderApp(root: HTMLElement): void {
       for (const n of notes) ul.append(el('li', { text: n }));
       noteBox.append(ul);
 
+      const creditBox = el('div', {
+        attrs: {
+          style: 'margin-top:0.9rem; padding-top:0.75rem; border-top:1px solid var(--border); font-size:0.82rem; color:var(--ink-muted); line-height:1.5;'
+        }
+      });
+      creditBox.append(
+        el('div', {
+          text: loc === 'tr' ? 'Proje Yürütücüsü / Geliştirici' : 'Principal Developer',
+          attrs: { style: 'font-weight:600; color:var(--ink);' }
+        }),
+        el('div', {
+          text: loc === 'tr'
+            ? 'Berke Avcı — Atatürk Üniversitesi, Fen Fakültesi, Fizik Bölümü'
+            : 'Berke Avcı — Atatürk University, Faculty of Science, Dept. of Physics'
+        }),
+        el('div', {
+          text: 'GitHub: github.com/fsb3rke/oscillalab',
+          attrs: { style: 'font-family:var(--font-mono); font-size:0.75rem; margin-top:0.2rem; color:var(--ink-faint);' }
+        })
+      );
+      noteBox.append(creditBox);
+
       cols.append(leftSide, noteBox);
       main.append(cols);
     } else {

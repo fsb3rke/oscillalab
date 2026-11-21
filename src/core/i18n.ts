@@ -9,8 +9,8 @@ const STORAGE_KEY = 'oscillalab.locale';
 
 const DICTIONARY = {
   brandMeta: {
-    tr: 'Fizik Bölümü • Titreşim ve Dalgalar Araştırma ve Uygulama Platformu',
-    en: 'Department of Physics • Oscillations & Waves Digital Twin Platform'
+    tr: 'Atatürk Üniversitesi • Fizik Bölümü — Titreşim ve Dalgalar Dijital İkiz Platformu',
+    en: 'Atatürk University • Department of Physics — Oscillations & Waves Digital Twin Platform'
   },
   backToList: { tr: '← Deney Modüllerine Dön', en: '← Return to Modules' },
   kicker: { tr: 'DENEYSEL FİZİK VE SAYISAL MODELLEME', en: 'EXPERIMENTAL PHYSICS & NUMERICAL MODELING' },
@@ -37,8 +37,8 @@ const DICTIONARY = {
   tabAnalysis: { tr: '4. Deneysel Veri ve Belirsizlik Analizi', en: '4. Experimental Data & Uncertainty' },
   preparing: { tr: 'modül içeriği hazırlanmaktadır.', en: 'module content is under preparation.' },
   footerLeft: {
-    tr: 'OscillaLab • Fizik Bölümü Lisans Araştırma Projesi',
-    en: 'OscillaLab • Undergraduate Physics Research Project'
+    tr: 'OscillaLab • Geliştirici: Berke Avcı (Atatürk Üniversitesi, Fizik Bölümü)',
+    en: 'OscillaLab • Developer: Berke Avcı (Atatürk University, Dept. of Physics)'
   },
   footerRight: { tr: 'Yerel ve Çevrimdışı Çalışma Mimarisi (CSP Korumalı)', en: 'Local & Offline Architecture (CSP Enforced)' },
   themeAuto: { tr: 'Sistem', en: 'System' },

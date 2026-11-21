@@ -54,6 +54,11 @@ Derlenen dosyalar `dist/` dizini altında oluşturulur.
 
 Detaylar için `CONTRIBUTING.md` dosyasına bakabilirsiniz.
 
+## Geliştirici
+
+**Berke Avcı** — Atatürk Üniversitesi, Fen Fakültesi, Fizik Bölümü  
+GitHub: [@fsb3rke](https://github.com/fsb3rke)
+
 ## Lisans
 
 MIT
