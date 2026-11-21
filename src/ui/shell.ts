@@ -4,6 +4,7 @@ import { el } from '../core/sanitize';
 import { stepRK4 } from '../core/rk4';
 import { getLocale, setLocale, t, tx, onLocaleChange, type Locale, type DictKey } from '../core/i18n';
 import { getThemeMode, setThemeMode, type ThemeMode } from '../core/theme';
+import { mountSim3D } from './sim3d-viewer';
 
 type TabKey = 'setup' | 'theory' | 'sim3d' | 'analysis';
 
@@ -31,9 +32,7 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
   const derivs = (s: readonly number[]): number[] => {
     const x = s[0] ?? 0;
     const v = s[1] ?? 0;
-    const omega0 = 5.5;
-    const gamma = 0.35;
-    return [v, -2 * gamma * v - omega0 * omega0 * x];
+    return [v, -2 * 0.35 * v - 30.25 * x];
   };
 
   const render = () => {
@@ -48,7 +47,6 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
     ctx.scale(dpr, dpr);
     const w = rect.width;
     const h = rect.height;
-
     ctx.clearRect(0, 0, w, h);
 
     ctx.strokeStyle = getCssVar('--scope-axis', '#e4e4e7');
@@ -99,13 +97,12 @@ function mountLiveScope(canvas: HTMLCanvasElement): () => void {
 
 export function renderApp(root: HTMLElement): void {
   let activeExp: ExperimentModule | null = null;
-  let activeTab: TabKey = 'setup';
-  let cleanupScope: (() => void) | null = null;
+  let activeTab: TabKey = 'sim3d';
+  let cleanupActive: (() => void) | null = null;
 
   function buildControls(): HTMLElement {
     const wrap = el('div', { className: 'controls' });
 
-    // Dil Seçici (TR | EN)
     const langGroup = el('div', { className: 'segmented', attrs: { role: 'group', 'aria-label': 'Language' } });
     const locales: readonly Locale[] = ['tr', 'en'];
     for (const loc of locales) {
@@ -118,7 +115,6 @@ export function renderApp(root: HTMLElement): void {
       langGroup.append(btn);
     }
 
-    // Tema Seçici (Sistem | Açık | Koyu)
     const themeGroup = el('div', { className: 'segmented', attrs: { role: 'group', 'aria-label': 'Theme' } });
     const modes: readonly { mode: ThemeMode; labelKey: DictKey }[] = [
       { mode: 'system', labelKey: 'themeAuto' },
@@ -143,9 +139,9 @@ export function renderApp(root: HTMLElement): void {
   }
 
   function draw(): void {
-    if (cleanupScope) {
-      cleanupScope();
-      cleanupScope = null;
+    if (cleanupActive) {
+      cleanupActive();
+      cleanupActive = null;
     }
     root.replaceChildren();
 
@@ -191,7 +187,7 @@ export function renderApp(root: HTMLElement): void {
       headerGrid.append(intro, scopeBox);
       main.append(headerGrid);
 
-      cleanupScope = mountLiveScope(canvas);
+      cleanupActive = mountLiveScope(canvas);
 
       const experiments = getAllExperiments();
       const secBar = el('div', { className: 'section-bar' });
@@ -202,32 +198,21 @@ export function renderApp(root: HTMLElement): void {
       main.append(secBar);
 
       const list = el('div', { className: 'exp-list' });
-      if (experiments.length === 0) {
+      for (const exp of experiments) {
         const row = el('div', { className: 'exp-row' });
+        const openBtn = el('button', { className: 'btn', text: t('openExp') });
+        openBtn.addEventListener('click', () => {
+          activeExp = exp;
+          activeTab = 'sim3d';
+          draw();
+        });
         row.append(
-          el('span', { className: 'exp-code', text: t('emptyCode') }),
-          el('span', { className: 'exp-name', text: t('emptyTitle') }),
-          el('span', { className: 'exp-desc', text: t('emptyDesc') }),
-          el('span', { className: 'exp-code', text: '—' })
+          el('span', { className: 'exp-code', text: exp.courseCode }),
+          el('span', { className: 'exp-name', text: tx(exp.title) }),
+          el('span', { className: 'exp-desc', text: tx(exp.summary) }),
+          openBtn
         );
         list.append(row);
-      } else {
-        for (const exp of experiments) {
-          const row = el('div', { className: 'exp-row' });
-          const openBtn = el('button', { className: 'btn', text: t('openExp') });
-          openBtn.addEventListener('click', () => {
-            activeExp = exp;
-            activeTab = 'setup';
-            draw();
-          });
-          row.append(
-            el('span', { className: 'exp-code', text: exp.courseCode }),
-            el('span', { className: 'exp-name', text: tx(exp.title) }),
-            el('span', { className: 'exp-desc', text: tx(exp.summary) }),
-            openBtn
-          );
-          list.append(row);
-        }
       }
       main.append(list);
     } else {
@@ -257,14 +242,28 @@ export function renderApp(root: HTMLElement): void {
       main.append(tabBar);
 
       const workspace = el('section', { className: 'workspace' });
-      const activeTabObj = TABS.find((tab) => tab.key === activeTab);
-      workspace.append(
-        el('h3', { text: activeTabObj ? t(activeTabObj.labelKey) : '' }),
-        el('p', {
-          className: 'exp-desc',
-          text: `${tx(activeExp.title)} — ${t('preparing')}`
-        })
-      );
+      if (activeTab === 'sim3d') {
+        cleanupActive = mountSim3D(workspace, activeExp);
+      } else if (activeTab === 'setup') {
+        const partsGrid = el('div', { attrs: { style: 'display:grid; gap:0.75rem;' } });
+        for (const hs of activeExp.hotspots) {
+          const item = el('div', {
+            attrs: { style: 'padding:0.85rem; border:1px solid var(--border); border-radius:var(--radius);' }
+          });
+          item.append(
+            el('div', { attrs: { style: 'font-weight:600; margin-bottom:0.25rem;' }, text: `0${hs.id}. ${tx(hs.title)}` }),
+            el('p', { className: 'exp-desc', text: tx(hs.description) })
+          );
+          partsGrid.append(item);
+        }
+        workspace.append(partsGrid);
+      } else {
+        const activeTabObj = TABS.find((tab) => tab.key === activeTab);
+        workspace.append(
+          el('h3', { text: activeTabObj ? t(activeTabObj.labelKey) : '' }),
+          el('p', { className: 'exp-desc', text: `${tx(activeExp.title)} — ${t('preparing')}` })
+        );
+      }
       main.append(workspace);
     }
 
