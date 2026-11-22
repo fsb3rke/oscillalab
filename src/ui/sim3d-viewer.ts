@@ -1515,20 +1515,29 @@ function mountCoupledOscillators3D(container: HTMLElement, exp: ExperimentModule
     const lbl = el('span', { text: tx(param.label) });
     const valSpan = el('span', { text: String(params[param.id] ?? param.defaultValue) });
     top.append(lbl, valSpan);
+    const spanRange = Math.max(param.max - param.min, 1e-9);
+    const syncSliderFill = (val: number) => {
+      const pct = Math.max(0, Math.min(100, ((val - param.min) / spanRange) * 100));
+      input.style.setProperty("--pct", `${pct.toFixed(2)}%`);
+    };
+    const initialVal = clampNumber(Number(params[param.id] ?? param.defaultValue), param.min, param.max, param.defaultValue);
     const input = el('input', {
+      className: 'lab-slider',
       attrs: {
         type: 'range',
         min: String(param.min),
         max: String(param.max),
         step: String(param.step),
-        value: String(params[param.id] ?? param.defaultValue),
+        value: String(initialVal),
         style: 'width:100%;'
       }
     }) as HTMLInputElement;
+    syncSliderFill(initialVal);
     input.addEventListener('input', () => {
       const parsed = clampNumber(Number(input.value), param.min, param.max, param.defaultValue);
       params[param.id] = parsed;
       valSpan.textContent = parsed.toFixed(param.step < 0.1 ? 2 : 1);
+      syncSliderFill(parsed);
     });
     sliderInputs.set(param.id, input);
     valueSpans.set(param.id, valSpan);
