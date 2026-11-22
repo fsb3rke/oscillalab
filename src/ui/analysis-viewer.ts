@@ -3,12 +3,13 @@ import { computeSampleStats, fitLinearLeastSquares } from "../core/statistics";
 import { clampNumber, el } from "../core/sanitize";
 import { getLocale } from "../core/i18n";
 import { resolveEffectiveTheme } from "../core/theme";
+import { drainCapturedMeasurements, onCapturedMeasurement, type CapturedMeasurement } from "../core/lab-store";
 
-interface TrialRow { xVal: number; trials: [number, number, number]; }
+interface TrialRow { xVal: number; trials: [number, number, number]; nextSlot: number; }
 interface ExpAnalysisMeta {
   xHeader: string; xSymbol: string; xUnit: string; xMin: number; xMax: number; xStep: number;
-  targetSymbol: string; targetUnit: string; theoreticalVal: number;
-  defaultRows: TrialRow[]; predictPeriod: (x: number) => number;
+  targetName: string; targetSymbol: string; targetUnit: string; theoreticalVal: number;
+  defaultRows: { xVal: number; trials: [number, number, number] }[]; predictPeriod: (x: number) => number;
 }
 
 function getExpAnalysisMeta(expId: string): ExpAnalysisMeta {
@@ -16,7 +17,7 @@ function getExpAnalysisMeta(expId: string): ExpAnalysisMeta {
     const kRef = 14.0;
     return {
       xHeader: "m (kg)", xSymbol: "m", xUnit: "kg", xMin: 0.05, xMax: 5.0, xStep: 0.05,
-      targetSymbol: "k", targetUnit: "N/m", theoreticalVal: kRef,
+      targetName: "Yay Sabiti", targetSymbol: "k", targetUnit: "N/m", theoreticalVal: kRef,
       defaultRows: [
         { xVal: 0.20, trials: [0.752, 0.748, 0.755] },
         { xVal: 0.35, trials: [0.994, 0.989, 0.997] },
@@ -29,7 +30,7 @@ function getExpAnalysisMeta(expId: string): ExpAnalysisMeta {
   const kappaRef = 0.12;
   return {
     xHeader: "I (kg·m²)", xSymbol: "I", xUnit: "kg·m²", xMin: 0.001, xMax: 0.2, xStep: 0.001,
-    targetSymbol: "κ", targetUnit: "N·m/rad", theoreticalVal: kappaRef,
+    targetName: "Burulma Sabiti", targetSymbol: "κ", targetUnit: "N·m/rad", theoreticalVal: kappaRef,
     defaultRows: [
       { xVal: 0.008, trials: [1.62, 1.64, 1.61] },
       { xVal: 0.012, trials: [1.98, 2.01, 1.99] },
@@ -43,7 +44,7 @@ function getExpAnalysisMeta(expId: string): ExpAnalysisMeta {
 export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModule): void {
   const loc = getLocale();
   const meta = getExpAnalysisMeta(exp.id);
-  const rows: TrialRow[] = meta.defaultRows.map((r) => ({ xVal: r.xVal, trials: [...r.trials] }));
+  const rows: TrialRow[] = meta.defaultRows.map((r) => ({ xVal: r.xVal, trials: [...r.trials], nextSlot: 0 }));
 
   const labels = {
     addRow: ({ tr: "+ Satır Ekle", en: "+ Add Row", de: "+ Zeile", fr: "+ Ligne" })[loc],
@@ -51,6 +52,7 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
     resetData: ({ tr: "Varsayılan Veri", en: "Reset Data", de: "Zurücksetzen", fr: "Réinitialiser" })[loc],
     exportCsv: ({ tr: "CSV İndir", en: "Export CSV", de: "CSV", fr: "CSV" })[loc],
     copyLatex: ({ tr: "LaTeX Tablosu Kopyala", en: "Copy LaTeX Table", de: "LaTeX-Tabelle", fr: "Table LaTeX" })[loc],
+    downloadReport: ({ tr: "Tam LaTeX Raporu (.tex)", en: "Full LaTeX Report (.tex)", de: "LaTeX-Bericht (.tex)", fr: "Rapport LaTeX (.tex)" })[loc],
     copied: ({ tr: "Kopyalandı ✓", en: "Copied ✓", de: "Kopiert ✓", fr: "Copié ✓" })[loc],
     regTitle: ({ tr: "En Küçük Kareler Regresyonu ve Belirsizlik", en: "OLS Regression & Uncertainty", de: "Lineare Regression", fr: "Régression Linéaire" })[loc]
   };
@@ -70,7 +72,8 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
   const exportToolbar = el("div", { attrs: { style: "display:flex; flex-wrap:wrap; gap:0.5rem;" } });
   const csvBtn = el("button", { className: "btn", text: labels.exportCsv });
   const latexBtn = el("button", { className: "btn btn-outline", text: labels.copyLatex });
-  exportToolbar.append(csvBtn, latexBtn);
+  const reportBtn = el("button", { className: "btn btn-outline", text: labels.downloadReport });
+  exportToolbar.append(csvBtn, latexBtn, reportBtn);
   leftCol.append(tableWrap, dataToolbar, exportToolbar);
 
   const rightCol = el("div", { attrs: { style: "background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; display:flex; flex-direction:column; gap:0.85rem;" } });
@@ -80,6 +83,22 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
   rightCol.append(regTitle, regCanvas, summaryBox);
   layout.append(leftCol, rightCol);
   container.append(layout);
+
+  let latestSummary = { slope: 0, slopeErr: 0, intercept: 0, rSq: 0, derived: 0, derivedErr: 0, relPct: 0 };
+
+  const ingestMeasurement = (m: CapturedMeasurement) => {
+    if (m.expId !== exp.id) return;
+    const targetRow = rows.find((r) => Math.abs(r.xVal - m.xVal) < meta.xStep * 0.4);
+    const val = Number(m.period.toFixed(3));
+    if (targetRow) {
+      targetRow.trials[targetRow.nextSlot % 3] = val;
+      targetRow.nextSlot += 1;
+    } else {
+      rows.push({ xVal: Number(m.xVal.toFixed(4)), trials: [val, val, val], nextSlot: 1 });
+    }
+  };
+
+  for (const pending of drainCapturedMeasurements(exp.id)) ingestMeasurement(pending);
 
   const recompute = () => {
     const xs: number[] = [], ys: number[] = [], yErrs: number[] = [];
@@ -132,6 +151,7 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
       const derivedParam = fourPiSq / fit.slope;
       const derivedErr = (fourPiSq / (fit.slope * fit.slope)) * fit.slopeError;
       const relPct = (Math.abs(derivedParam - meta.theoreticalVal) / meta.theoreticalVal) * 100;
+      latestSummary = { slope: fit.slope, slopeErr: fit.slopeError, intercept: fit.intercept, rSq: fit.rSquared, derived: derivedParam, derivedErr, relPct };
       const lines = [
         `${loc === "tr" ? "Eğim (m)" : "Slope (m)"}: ${fit.slope.toFixed(2)} ± ${fit.slopeError.toFixed(2)} s²/${meta.xUnit}`,
         `R² = ${fit.rSquared.toFixed(5)}`,
@@ -169,8 +189,8 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
 
       const comp = computed[rIdx]!;
       tr.append(
-        el("td", { text: `${comp.stats.mean.toFixed(3)} ± ${comp.stats.stdError.toFixed(3)}`, attrs: { style: "padding:0.35rem 0.5rem; white-space:nowrap;" } }),
-        el("td", { text: `${comp.tSq.toFixed(3)} ± ${comp.dtSq.toFixed(3)}`, attrs: { style: "padding:0.35rem 0.5rem; white-space:nowrap;" } })
+        el("td", { text: `${comp.stats.mean.toFixed(3)} ±${comp.stats.stdError.toFixed(3)}`, attrs: { style: "padding:0.35rem 0.5rem; white-space:nowrap;" } }),
+        el("td", { text: `${comp.tSq.toFixed(3)} ±${comp.dtSq.toFixed(3)}`, attrs: { style: "padding:0.35rem 0.5rem; white-space:nowrap;" } })
       );
 
       const delTd = el("td", { attrs: { style: "padding:0.35rem; text-align:center;" } });
@@ -184,10 +204,18 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
     table.append(tbody);
   };
 
+  onCapturedMeasurement((item) => {
+    if (item.expId === exp.id) {
+      drainCapturedMeasurements(exp.id);
+      ingestMeasurement(item);
+      renderTable();
+    }
+  });
+
   addRowBtn.addEventListener("click", () => {
     const nextX = Number(((rows[rows.length - 1]?.xVal ?? meta.xStep * 4) + meta.xStep * 4).toFixed(4));
     const t0 = meta.predictPeriod(nextX);
-    rows.push({ xVal: nextX, trials: [Number(t0.toFixed(3)), Number((t0 + 0.004).toFixed(3)), Number((t0 - 0.003).toFixed(3))] });
+    rows.push({ xVal: nextX, trials: [Number(t0.toFixed(3)), Number((t0 + 0.004).toFixed(3)), Number((t0 - 0.003).toFixed(3))], nextSlot: 0 });
     renderTable();
   });
 
@@ -195,36 +223,62 @@ export function mountAnalysisViewer(container: HTMLElement, exp: ExperimentModul
     const nextX = Number(((rows[rows.length - 1]?.xVal ?? meta.xStep * 4) + meta.xStep * 3).toFixed(4));
     const t0 = meta.predictPeriod(nextX);
     const j = () => (Math.random() - 0.5) * 0.024;
-    rows.push({ xVal: nextX, trials: [Number((t0 + j()).toFixed(3)), Number((t0 + j()).toFixed(3)), Number((t0 + j()).toFixed(3))] });
+    rows.push({ xVal: nextX, trials: [Number((t0 + j()).toFixed(3)), Number((t0 + j()).toFixed(3)), Number((t0 + j()).toFixed(3))], nextSlot: 0 });
     renderTable();
   });
 
   resetBtn.addEventListener("click", () => {
     rows.length = 0;
-    meta.defaultRows.forEach((r) => rows.push({ xVal: r.xVal, trials: [...r.trials] }));
+    meta.defaultRows.forEach((r) => rows.push({ xVal: r.xVal, trials: [...r.trials], nextSlot: 0 }));
     renderTable();
   });
 
+  const buildTabularRows = () => rows.map((r) => {
+    const s = computeSampleStats(r.trials);
+    return `${r.xVal} & ${r.trials[0].toFixed(3)} & ${r.trials[1].toFixed(3)} & ${r.trials[2].toFixed(3)} & $${s.mean.toFixed(3)} \\pm ${s.stdError.toFixed(3)}$ & $${(s.mean ** 2).toFixed(3)} \\pm ${(2 * s.mean * s.stdError).toFixed(3)}$ \\\\`;
+  });
+
   csvBtn.addEventListener("click", () => {
-    const lines = [`${meta.xSymbol},T1,T2,T3,T_mean,StdErr,T_sq,dT_sq`];
-    for (const r of rows) {
-      const s = computeSampleStats(r.trials);
-      lines.push(`${r.xVal},${r.trials[0]},${r.trials[1]},${r.trials[2]},${s.mean.toFixed(4)},${s.stdError.toFixed(4)},${(s.mean ** 2).toFixed(4)},${(2 * s.mean * s.stdError).toFixed(4)}`);
-    }
-    const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }));
-    const a = document.createElement("a"); a.href = url; a.download = `${exp.id}-analiz.csv`; a.click(); URL.revokeObjectURL(url);
+    const lines = [`${meta.xSymbol},T1,T2,T3,T_mean,StdErr,T_sq,dT_sq`]; for (const r of rows) { const s = computeSampleStats(r.trials); lines.push(`${r.xVal},${r.trials[0]},${r.trials[1]},${r.trials[2]},${s.mean.toFixed(4)},${s.stdError.toFixed(4)},${(s.mean ** 2).toFixed(4)},${(2 * s.mean * s.stdError).toFixed(4)}`); } const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" })); const a = document.createElement("a"); a.href = url; a.download = `${exp.id}-analiz.csv`; a.click(); URL.revokeObjectURL(url);
   });
 
   latexBtn.addEventListener("click", async () => {
-    const tex = ["\\begin{tabular}{cccccc}", "\\hline", `${meta.xHeader} & $T_1$ & $T_2$ & $T_3$ & $\\bar{T} \\pm \\sigma_{\\bar{T}}$ & $T^2 \\pm \\delta(T^2)$ \\\\`, "\\hline"];
-    for (const r of rows) {
-      const s = computeSampleStats(r.trials);
-      tex.push(`${r.xVal} & ${r.trials[0].toFixed(3)} & ${r.trials[1].toFixed(3)} & ${r.trials[2].toFixed(3)} & $${s.mean.toFixed(3)} \\pm ${s.stdError.toFixed(3)}$ & $${(s.mean ** 2).toFixed(3)} \\pm ${(2 * s.mean * s.stdError).toFixed(3)}$ \\\\`);
-    }
-    tex.push("\\hline", "\\end{tabular}");
+    const tex = ["\\begin{tabular}{cccccc}", "\\hline", `${meta.xHeader} & $T_1$ & $T_2$ & $T_3$ & $\\bar{T} \\pm \\sigma_{\\bar{T}}$ & $T^2 \\pm \\delta(T^2)$ \\\\`, "\\hline", ...buildTabularRows(), "\\hline", "\\end{tabular}"];
     await navigator.clipboard.writeText(tex.join("\n")).catch(() => {});
     const orig = latexBtn.textContent; latexBtn.textContent = labels.copied;
     setTimeout(() => { latexBtn.textContent = orig; }, 1500);
+  });
+
+  reportBtn.addEventListener("click", () => {
+    const docLines = [
+      "\\documentclass[12pt,a4paper]{article}",
+      "\\usepackage[utf8]{inputenc}",
+      "\\usepackage[T1]{fontenc}",
+      "\\usepackage{amsmath,booktabs,geometry}",
+      "\\geometry{margin=2.2cm}",
+      `\\title{OscillaLab Deney Raporu: ${exp.title.tr}}`,
+      "\\author{Atatürk Üniversitesi --- Fen Fakültesi Fizik Bölümü}",
+      "\\date{\\today}",
+      "\\begin{document}",
+      "\\maketitle",
+      "\\section{Deneysel Ölçüm Çizelgesi}",
+      "\\begin{table}[h]",
+      "\\centering",
+      "\\begin{tabular}{cccccc}",
+      "\\toprule",
+      `${meta.xHeader} & $T_1$ (s) & $T_2$ (s) & $T_3$ (s) & $\\bar{T} \\pm \\sigma_{\\bar{T}}$ (s) & $T^2 \\pm \\delta(T^2)$ (s$^2$) \\\\`,
+      "\\midrule",
+      ...buildTabularRows(),
+      "\\bottomrule",
+      "\\end{tabular}",
+      "\\end{table}",
+      "\\section{Regresyon ve Belirsizlik Analizi}",
+      `En küçük kareler doğrusal regresyonu sonucunda eğim $m = ${latestSummary.slope.toFixed(3)} \\pm${latestSummary.slopeErr.toFixed(3)}$($R^2 = ${latestSummary.rSq.toFixed(5)}$) bulunmuştur.`,
+      `Deneysel ${meta.targetName} değeri $${meta.targetSymbol} = ${latestSummary.derived.toFixed(4)} \\pm${latestSummary.derivedErr.toFixed(4)}~\\text{${meta.targetUnit}}$ olup, kuramsal referans değere ($${meta.theoreticalVal.toFixed(4)}$) göre bağıl sapma $\\%%${latestSummary.relPct.toFixed(2)}$ olarak hesaplanmıştır.`,
+      "\\end{document}"
+    ];
+    const url = URL.createObjectURL(new Blob([docLines.join("\n")], { type: "application/x-tex;charset=utf-8;" }));
+    const a = document.createElement("a"); a.href = url; a.download = `${exp.id}-rapor.tex`; a.click(); URL.revokeObjectURL(url);
   });
 
   renderTable();

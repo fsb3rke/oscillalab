@@ -6,6 +6,7 @@ import { stepRK4 } from '../core/rk4';
 import { clampNumber, el } from '../core/sanitize';
 import { getLocale, tx } from '../core/i18n';
 import { resolveEffectiveTheme } from '../core/theme';
+import { pushCapturedMeasurement } from '../core/lab-store';
 
 function createProtractorTexture(): THREE.CanvasTexture {
   const size = 1024;
@@ -139,7 +140,10 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
   let tSec = 0;
   let paused = false;
   let showVectors = true;
-  let plotMode: 'time' | 'phase' = 'time';
+  let plotMode: 'time' | 'phase' | 'resonance' = 'time';
+  let lastCrossTime = -1;
+  let measuredPeriod = 0;
+  let prevXSign = 0;
   let isDraggingMass = false;
   const xTrace: number[] = [];
   const vTrace: number[] = [];
@@ -216,15 +220,12 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     text: ({ tr: 'Faz Uzayı (v–x)', en: 'Phase Space (v–x)', de: 'Phasenraum (v–x)', fr: 'Espace des Phases (v–x)' })[loc],
     attrs: { style: 'padding:2px 8px; font-size:0.72rem;' }
   });
+  plotToggleBtn.textContent = ({ tr: 'Grafik: Zaman / Faz / Rezonans', en: 'Plot: Time / Phase / Resonance', de: 'Plot: Zeit / Phase / Resonanz', fr: 'Graphe : Temps / Phase / Résonance' })[loc];
   plotToggleBtn.addEventListener('click', () => {
-    plotMode = plotMode === 'time' ? 'phase' : 'time';
-    if (plotMode === 'phase') {
-      plotLegend.textContent = phaseLegendText;
-      plotToggleBtn.textContent = ({ tr: 'Zaman Grafiği', en: 'Time Series', de: 'Zeitverlauf', fr: 'Série Temporelle' })[loc];
-    } else {
-      plotLegend.textContent = timeLegendText;
-      plotToggleBtn.textContent = ({ tr: 'Faz Uzayı (v–x)', en: 'Phase Space (v–x)', de: 'Phasenraum (v–x)', fr: 'Espace des Phases (v–x)' })[loc];
-    }
+    plotMode = plotMode === 'time' ? 'phase' : plotMode === 'phase' ? 'resonance' : 'time';
+    if (plotMode === 'phase') plotLegend.textContent = phaseLegendText;
+    else if (plotMode === 'resonance') plotLegend.textContent = ({ tr: 'Kararlı Hal Rezonans Eğrisi: A(ω_d)', en: 'Steady-State Resonance Curve: A(ω_d)', de: 'Resonanzkurve: A(ω_d)', fr: 'Courbe de Résonance : A(ω_d)' })[loc];
+    else plotLegend.textContent = timeLegendText;
   });
   plotHead.append(plotLegend, plotToggleBtn);
 
@@ -347,10 +348,27 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
     xTrace.length = 0;
     vTrace.length = 0;
     driveTrace.length = 0;
+    lastCrossTime = -1;
+    measuredPeriod = 0;
+    prevXSign = 0;
   });
 
   btnRow.append(toggleBtn, resetBtn);
   panel.append(btnRow);
+
+  const gateBox = el('div', { attrs: { style: 'margin-top:0.35rem; padding:0.65rem 0.75rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); display:flex; flex-direction:column; gap:0.45rem; font-family:var(--font-mono); font-size:0.76rem;' } });
+  const gateReadout = el('div', { text: loc === 'tr' ? 'Fotokapı Periyodu: bekleniyor...' : 'Photogate Period: waiting...' });
+  const sendTrialBtn = el('button', { className: 'btn btn-outline', text: loc === 'tr' ? 'Ölçümü Analiz Tablosuna Aktar' : 'Send Period to Analysis Table', attrs: { style: 'font-size:0.74rem;' } });
+  sendTrialBtn.addEventListener('click', () => {
+    if (measuredPeriod > 0.05) {
+      pushCapturedMeasurement({ expId: exp.id, xVal: params.mass ?? 0.45, period: measuredPeriod, timestamp: Date.now() });
+      const orig = sendTrialBtn.textContent;
+      sendTrialBtn.textContent = loc === 'tr' ? 'Tabloya Eklendi ✓' : 'Sent to Table ✓';
+      setTimeout(() => { sendTrialBtn.textContent = orig; }, 1400);
+    }
+  });
+  gateBox.append(gateReadout, sendTrialBtn);
+  panel.append(gateBox);
 
   layout.append(leftCol, panel);
   container.append(layout);
@@ -639,6 +657,16 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
       driveArrow.setLength(Math.min(0.95, 0.16 + Math.abs(fDrive) * 0.18), 0.13, 0.08);
     }
 
+    const curSign = x >= 0 ? 1 : -1;
+    if (!paused && !isDraggingMass && prevXSign < 0 && curSign > 0) {
+      if (lastCrossTime > 0) {
+        measuredPeriod = tSec - lastCrossTime;
+        gateReadout.textContent = `${loc === 'tr' ? 'Fotokapı T_ölçülen' : 'Photogate T_meas'} = ${measuredPeriod.toFixed(3)} s`;
+      }
+      lastCrossTime = tSec;
+    }
+    prevXSign = curSign;
+
     const w0 = Math.sqrt(k / m);
     hud.textContent = `t = ${tSec.toFixed(2)} s | x = ${(x * 100).toFixed(1)} cm | v = ${v.toFixed(2)} m/s | ω₀ = ${w0.toFixed(2)} rad/s | ω_d/ω₀ = ${(wd / w0).toFixed(2)}`;
 
@@ -690,7 +718,7 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
           else plotCtx.lineTo(px, py);
         }
         plotCtx.stroke();
-      } else {
+      } else if (plotMode === 'phase') {
         plotCtx.beginPath();
         plotCtx.moveTo(w / 2, 4);
         plotCtx.lineTo(w / 2, h - 4);
@@ -714,6 +742,37 @@ function mountSpringMass3D(container: HTMLElement, exp: ExperimentModule): () =>
         plotCtx.fillStyle = '#b91c1c';
         plotCtx.beginPath();
         plotCtx.arc(w / 2 + lastX * 190, h / 2 - lastV * 22, 3.5, 0, Math.PI * 2);
+        plotCtx.fill();
+      } else {
+        const w0Sq = k / m;
+        const gamma = b / (2 * m);
+        const fOverM = Math.max(0.1, f0 / m);
+        const wMax = 14.0;
+        const amps: number[] = [];
+        let maxAmp = 0.05;
+        for (let i = 0; i <= 120; i++) {
+          const wSample = (i / 120) * wMax;
+          const amp = fOverM / Math.sqrt((w0Sq - wSample * wSample) ** 2 + (2 * gamma * wSample) ** 2);
+          amps.push(amp);
+          if (amp > maxAmp) maxAmp = amp;
+        }
+        plotCtx.strokeStyle = isDark ? '#93c5fd' : '#1e3a8a';
+        plotCtx.lineWidth = 1.7;
+        plotCtx.beginPath();
+        for (let i = 0; i <= 120; i++) {
+          const px = 12 + (i / 120) * (w - 24);
+          const py = h - 12 - ((amps[i] ?? 0) / (maxAmp * 1.12)) * (h - 24);
+          if (i === 0) plotCtx.moveTo(px, py);
+          else plotCtx.lineTo(px, py);
+        }
+        plotCtx.stroke();
+
+        const curAmp = fOverM / Math.sqrt((w0Sq - wd * wd) ** 2 + (2 * gamma * wd) ** 2);
+        const curPx = 12 + (wd / wMax) * (w - 24);
+        const curPy = h - 12 - (curAmp / (maxAmp * 1.12)) * (h - 24);
+        plotCtx.fillStyle = '#b91c1c';
+        plotCtx.beginPath();
+        plotCtx.arc(curPx, curPy, 4.2, 0, Math.PI * 2);
         plotCtx.fill();
       }
     }
@@ -758,6 +817,9 @@ function mountTorsionalPendulum3D(container: HTMLElement, exp: ExperimentModule)
   let showVectors = true;
   let plotMode: 'time' | 'phase' = 'time';
   let isDraggingDisc = false;
+  let tpLastCross = -1;
+  let tpMeasuredPeriod = 0;
+  let tpPrevSign = 0;
   const thetaTrace: number[] = [];
   const omegaTrace: number[] = [];
 
@@ -949,6 +1011,20 @@ function mountTorsionalPendulum3D(container: HTMLElement, exp: ExperimentModule)
 
   btnRow.append(toggleBtn, resetBtn);
   panel.append(btnRow);
+
+  const tpGateBox = el('div', { attrs: { style: 'margin-top:0.35rem; padding:0.65rem 0.75rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); display:flex; flex-direction:column; gap:0.45rem; font-family:var(--font-mono); font-size:0.76rem;' } });
+  const tpGateReadout = el('div', { text: loc === 'tr' ? 'Optik Fotokapı: bekleniyor...' : 'Optical Photogate: waiting...' });
+  const tpSendBtn = el('button', { className: 'btn btn-outline', text: loc === 'tr' ? 'Ölçümü Analiz Tablosuna Aktar' : 'Send Period to Analysis Table', attrs: { style: 'font-size:0.74rem;' } });
+  tpSendBtn.addEventListener('click', () => {
+    if (tpMeasuredPeriod > 0.05) {
+      pushCapturedMeasurement({ expId: exp.id, xVal: params.inertia ?? 0.012, period: tpMeasuredPeriod, timestamp: Date.now() });
+      const orig = tpSendBtn.textContent;
+      tpSendBtn.textContent = loc === 'tr' ? 'Tabloya Eklendi ✓' : 'Sent to Table ✓';
+      setTimeout(() => { tpSendBtn.textContent = orig; }, 1400);
+    }
+  });
+  tpGateBox.append(tpGateReadout, tpSendBtn);
+  panel.append(tpGateBox);
 
   layout.append(leftCol, panel);
   container.append(layout);
@@ -1240,6 +1316,16 @@ function mountTorsionalPendulum3D(container: HTMLElement, exp: ExperimentModule)
       );
     }
     posAttr.needsUpdate = true;
+
+    const tpCurSign = theta >= 0 ? 1 : -1;
+    if (!paused && !isDraggingDisc && tpPrevSign < 0 && tpCurSign > 0) {
+      if (tpLastCross > 0) {
+        tpMeasuredPeriod = tSec - tpLastCross;
+        tpGateReadout.textContent = `${loc === 'tr' ? 'Fotokapı T_ölçülen' : 'Photogate T_meas'} = ${tpMeasuredPeriod.toFixed(3)} s`;
+      }
+      tpLastCross = tSec;
+    }
+    tpPrevSign = tpCurSign;
 
     const energyMj = (0.5 * inertiaVal * omega * omega + 0.5 * kappa * theta * theta) * 1000;
     const period = 2 * Math.PI * Math.sqrt(inertiaVal / kappa);
