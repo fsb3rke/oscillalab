@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-strip-types --test tests/physics.test.ts",
+    "test": "node --import ./scripts/ts-resolve-loader.mjs --experimental-strip-types --test tests/physics.test.ts",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"

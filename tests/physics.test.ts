@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { stepRK4 } from "../src/core/rk4.ts";
 import { computeSampleStats, fitLinearLeastSquares } from "../src/core/statistics.ts";
+import { coupledOscillatorsExperiment } from "../src/experiments/coupled-oscillators/index.ts";
 
 test("RK4 harmonic oscillator preserves mechanical energy within 1e-6", () => {
   const k = 16.0;
@@ -17,7 +18,7 @@ test("RK4 harmonic oscillator preserves mechanical energy within 1e-6", () => {
   }
 
   const eFinal = 0.5 * k * state[0]! ** 2 + 0.5 * m * state[1]! ** 2;
-  assert.ok(Math.abs(eFinal - e0) < 1e-6, `Energy drift too large: ${Math.abs(eFinal - e0)}`);
+  assert.ok(Math.abs(eFinal - e0) < 1e-6, "Energy drift too large: " + Math.abs(eFinal - e0));
 });
 
 test("OLS regression recovers exact spring constant k from noiseless T^2 vs m", () => {
@@ -37,8 +38,6 @@ test("Bessel-corrected standard error computes accurately", () => {
   assert.ok(Math.abs(stats.mean - 1.623333) < 1e-4);
   assert.ok(stats.stdError > 0);
 });
-
-import { coupledOscillatorsExperiment } from "../src/experiments/coupled-oscillators/index.ts";
 
 test("EXP-03 symmetric mode oscillates at omega_plus = sqrt(k / m)", () => {
   const params = { mass: 0.6, springK: 12.0, couplingK: 2.0, dampingB: 0.0, x1Init: 0.12, x2Init: 0.12 };
@@ -91,5 +90,5 @@ test("EXP-03 beat mode transfers energy between x1 and x2 at beat envelope", () 
     if (Math.abs(state[2] ?? 0) > maxX2) maxX2 = Math.abs(state[2] ?? 0);
   }
 
-  assert.ok(maxX2 > 0.11, `Expected strong energy transfer to x2, got maxX2=${maxX2}`);
+  assert.ok(maxX2 > 0.11, "Expected strong energy transfer to x2, got maxX2=" + maxX2);
 });
