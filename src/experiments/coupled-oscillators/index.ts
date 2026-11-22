@@ -1,4 +1,5 @@
 import type { ExperimentModule } from "../../core/types";
+import { registerExperiment } from "../../core/registry";
 
 export const coupledOscillatorsExperiment: ExperimentModule = {
   id: "coupled-oscillators",
@@ -56,3 +57,5 @@ export const coupledOscillatorsExperiment: ExperimentModule = {
     return [v1, a1, v2, a2];
   }
 };
+
+registerExperiment(coupledOscillatorsExperiment);
