@@ -13,6 +13,21 @@ interface ExpAnalysisMeta {
 }
 
 function getExpAnalysisMeta(expId: string): ExpAnalysisMeta {
+  if (expId === "coupled-oscillators") {
+    const kBase = 12.0;
+    const kcRef = 2.0;
+    return {
+      xHeader: "kc (N/m)", xSymbol: "kc", xUnit: "N/m", xMin: 0.2, xMax: 12.0, xStep: 0.2,
+      targetName: "Bağlaşım Sabiti", targetSymbol: "kc", targetUnit: "N/m", theoreticalVal: kcRef,
+      defaultRows: [
+        { xVal: 1.0, trials: [1.625, 1.622, 1.628] },
+        { xVal: 2.0, trials: [1.451, 1.448, 1.454] },
+        { xVal: 3.0, trials: [1.318, 1.321, 1.315] },
+        { xVal: 4.0, trials: [1.212, 1.209, 1.215] }
+      ],
+      predictPeriod: (kcVal: number) => 2 * Math.PI * Math.sqrt(0.6 / (kBase + 2 * Math.max(0.05, kcVal)))
+    };
+  }
   if (expId === "driven-spring-mass") {
     const kRef = 14.0;
     return {
