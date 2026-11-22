@@ -123,6 +123,9 @@ function createRulerTexture(vertical = false): THREE.CanvasTexture {
 }
 
 export function mountSim3D(container: HTMLElement, exp: ExperimentModule): () => void {
+  if (exp.id === 'coupled-oscillators') {
+    return mountCoupledOscillators3D(container, exp);
+  }
   if (exp.id === 'driven-spring-mass') {
     return mountSpringMass3D(container, exp);
   }
@@ -1428,6 +1431,294 @@ function mountTorsionalPendulum3D(container: HTMLElement, exp: ExperimentModule)
     controls.dispose();
     scaleTex.dispose();
     rulerTex.dispose();
+    pmrem.dispose();
+    renderer.dispose();
+  };
+}
+
+function mountCoupledOscillators3D(container: HTMLElement, exp: ExperimentModule): () => void {
+  const loc = getLocale();
+  const isDark = resolveEffectiveTheme() === 'dark';
+  const params: Record<string, number> = {};
+  for (const param of exp.parameters) {
+    params[param.id] = param.defaultValue;
+  }
+
+  let state = exp.getInitialState(params);
+  let tSec = 0;
+  let paused = false;
+  const x1Trace: number[] = [];
+  const x2Trace: number[] = [];
+  const sliderInputs = new Map<string, HTMLInputElement>();
+  const valueSpans = new Map<string, HTMLSpanElement>();
+
+  const root = el('div', {
+    attrs: { style: 'display:grid; grid-template-columns:minmax(0, 1.45fr) minmax(290px, 1fr); gap:1rem; align-items:start;' }
+  });
+  const leftCol = el('div', { attrs: { style: 'display:flex; flex-direction:column; gap:0.65rem;' } });
+  const viewport = el('div', {
+    attrs: { style: 'width:100%; height:410px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); position:relative;' }
+  });
+
+  const hud = el('div', {
+    attrs: {
+      style: 'position:absolute; left:10px; bottom:10px; padding:5px 9px; border-radius:6px; background:rgba(15,23,42,0.78); color:#f8fafc; font-family:var(--font-mono); font-size:0.72rem; pointer-events:none;'
+    }
+  });
+  viewport.append(hud);
+
+  const plotWrap = el('div', {
+    attrs: { style: 'border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-subtle); padding:0.55rem 0.7rem;' }
+  });
+  const plotLegend = el('div', {
+    text: loc === 'tr' ? 'Vuruş ve Normal Mod Zaman Serisi: x₁(t) [kırmızı] / x₂(t) [mavi]' : 'Beat & Normal Mode Time Series: x₁(t) [red] / x₂(t) [blue]',
+    attrs: { style: 'font-family:var(--font-mono); font-size:0.72rem; color:var(--text-muted); margin-bottom:0.35rem;' }
+  });
+  const plotCanvas = el('canvas', {
+    attrs: { style: 'width:100%; height:118px; display:block;' }
+  });
+  plotWrap.append(plotLegend, plotCanvas);
+  leftCol.append(viewport, plotWrap);
+
+  const panel = el('div', {
+    attrs: { style: 'background:var(--surface-subtle); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; display:flex; flex-direction:column; gap:0.7rem;' }
+  });
+
+  const presetRow = el('div', { attrs: { style: 'display:grid; grid-template-columns:repeat(3, 1fr); gap:0.4rem;' } });
+  const applyPreset = (x1: number, x2: number) => {
+    params.x1Init = x1;
+    params.x2Init = x2;
+    for (const [id, xVal] of [['x1Init', x1], ['x2Init', x2]] as const) {
+      const inp = sliderInputs.get(id);
+      const sp = valueSpans.get(id);
+      if (inp) inp.value = String(xVal);
+      if (sp) sp.textContent = xVal.toFixed(2);
+    }
+    state = exp.getInitialState(params);
+    tSec = 0;
+    x1Trace.length = 0;
+    x2Trace.length = 0;
+  };
+
+  const pSym = el('button', { className: 'btn btn-outline', text: loc === 'tr' ? 'Simetrik (ω+)' : 'Symmetric (ω+)', attrs: { style: 'font-size:0.72rem; padding:4px 6px;' } });
+  const pAnti = el('button', { className: 'btn btn-outline', text: loc === 'tr' ? 'Antisimetrik (ω-)' : 'Antisymmetric (ω-)', attrs: { style: 'font-size:0.72rem; padding:4px 6px;' } });
+  const pBeat = el('button', { className: 'btn btn-outline', text: loc === 'tr' ? 'Vuruş (Beats)' : 'Beat Mode', attrs: { style: 'font-size:0.72rem; padding:4px 6px;' } });
+  pSym.addEventListener('click', () => applyPreset(0.12, 0.12));
+  pAnti.addEventListener('click', () => applyPreset(0.12, -0.12));
+  pBeat.addEventListener('click', () => applyPreset(0.14, 0.0));
+  presetRow.append(pSym, pAnti, pBeat);
+  panel.append(presetRow);
+
+  for (const param of exp.parameters) {
+    const row = el('div', { attrs: { style: 'display:flex; flex-direction:column; gap:0.2rem;' } });
+    const top = el('div', { attrs: { style: 'display:flex; justify-content:space-between; font-size:0.78rem; font-family:var(--font-mono);' } });
+    const lbl = el('span', { text: tx(param.label) });
+    const valSpan = el('span', { text: String(params[param.id] ?? param.defaultValue) });
+    top.append(lbl, valSpan);
+    const input = el('input', {
+      attrs: {
+        type: 'range',
+        min: String(param.min),
+        max: String(param.max),
+        step: String(param.step),
+        value: String(params[param.id] ?? param.defaultValue),
+        style: 'width:100%;'
+      }
+    }) as HTMLInputElement;
+    input.addEventListener('input', () => {
+      const parsed = clampNumber(Number(input.value), param.min, param.max, param.defaultValue);
+      params[param.id] = parsed;
+      valSpan.textContent = parsed.toFixed(param.step < 0.1 ? 2 : 1);
+    });
+    sliderInputs.set(param.id, input);
+    valueSpans.set(param.id, valSpan);
+    row.append(top, input);
+    panel.append(row);
+  }
+
+  const ctrlRow = el('div', { attrs: { style: 'display:flex; gap:0.5rem;' } });
+  const pauseBtn = el('button', { className: 'btn btn-outline', text: loc === 'tr' ? 'Duraklat' : 'Pause', attrs: { style: 'flex:1;' } });
+  const resetBtn = el('button', { className: 'btn btn-outline', text: loc === 'tr' ? 'Sıfırla' : 'Reset', attrs: { style: 'flex:1;' } });
+  pauseBtn.addEventListener('click', () => {
+    paused = !paused;
+    pauseBtn.textContent = paused ? (loc === 'tr' ? 'Devam Et' : 'Resume') : (loc === 'tr' ? 'Duraklat' : 'Pause');
+  });
+  resetBtn.addEventListener('click', () => {
+    state = exp.getInitialState(params);
+    tSec = 0;
+    x1Trace.length = 0;
+    x2Trace.length = 0;
+  });
+  ctrlRow.append(pauseBtn, resetBtn);
+  panel.append(ctrlRow);
+  root.append(leftCol, panel);
+  container.append(root);
+
+  const width = viewport.clientWidth || 640;
+  const height = 410;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(isDark ? 0x161513 : 0xeae6dc);
+  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 60);
+  camera.position.set(0, 1.85, 6.2);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  viewport.append(renderer.domElement);
+
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0.2, 0);
+  controls.update();
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.8);
+  dirLight.position.set(3, 6, 4);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.6 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6, metalness: 0.5 });
+  const m1Mat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.35, metalness: 0.25 });
+  const m2Mat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.35, metalness: 0.25 });
+  const springMat = new THREE.MeshStandardMaterial({ color: 0xc89132, roughness: 0.3, metalness: 0.8 });
+
+  const baseRail = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.14, 0.7), railMat);
+  baseRail.position.set(0, -0.35, 0);
+  baseRail.receiveShadow = true;
+  scene.add(baseRail);
+
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.3, 0.7), wallMat);
+  leftWall.position.set(-2.65, 0.3, 0);
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.3, 0.7), wallMat);
+  rightWall.position.set(2.65, 0.3, 0);
+  scene.add(leftWall, rightWall);
+
+  const mass1 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), m1Mat);
+  mass1.position.set(-1.1, 0.0, 0);
+  mass1.castShadow = true;
+  const mass2 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), m2Mat);
+  mass2.position.set(1.1, 0.0, 0);
+  mass2.castShadow = true;
+  scene.add(mass1, mass2);
+
+  const makeSpringLine = (colorHex: number, widthPx: number) => {
+    const pts: THREE.Vector3[] = [];
+    const coils = 10;
+    for (let i = 0; i <= coils * 4; i++) {
+      const u = i / (coils * 4);
+      const r = i === 0 || i === coils * 4 ? 0 : 0.11;
+      const ang = u * coils * Math.PI * 2;
+      pts.push(new THREE.Vector3(u, Math.cos(ang) * r, Math.sin(ang) * r));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    return new THREE.Line(geo, new THREE.LineBasicMaterial({ color: colorHex, linewidth: widthPx }));
+  };
+
+  const sLeft = makeSpringLine(0xc89132, 2);
+  const sMid = makeSpringLine(0xd97706, 2);
+  const sRight = makeSpringLine(0xc89132, 2);
+  sMid.position.y = 0.05;
+  scene.add(sLeft, sMid, sRight);
+
+  const updateSpringSpan = (line: THREE.Line, xA: number, xB: number) => {
+    line.position.x = xA;
+    line.scale.x = Math.max(0.08, xB - xA);
+  };
+
+  const plotCtx = plotCanvas.getContext('2d')!;
+  let lastTs = performance.now();
+  let rafId = 0;
+
+  const animate = (now: number) => {
+    const dtFrame = Math.min(0.05, Math.max(0, (now - lastTs) / 1000));
+    lastTs = now;
+
+    if (!paused) {
+      const subSteps = Math.max(1, Math.ceil(dtFrame / 0.002));
+      const hStep = dtFrame / subSteps;
+      for (let i = 0; i < subSteps; i++) {
+        state = stepRK4(state, tSec, hStep, (s, tNow) => exp.computeDerivatives(s, tNow, params));
+        tSec += hStep;
+      }
+    }
+
+    const x1 = state[0] ?? 0;
+    const x2 = state[2] ?? 0;
+    const pos1 = -1.1 + x1 * 4.2;
+    const pos2 = 1.1 + x2 * 4.2;
+    mass1.position.x = pos1;
+    mass2.position.x = pos2;
+
+    updateSpringSpan(sLeft, -2.56, pos1 - 0.275);
+    updateSpringSpan(sMid, pos1 + 0.275, pos2 - 0.275);
+    updateSpringSpan(sRight, pos2 + 0.275, 2.56);
+
+    const m = Math.max(0.05, params.mass ?? 0.6);
+    const k = Math.max(0.1, params.springK ?? 12.0);
+    const kc = Math.max(0, params.couplingK ?? 2.0);
+    const wPlus = Math.sqrt(k / m);
+    const wMinus = Math.sqrt((k + 2 * kc) / m);
+    const wBeat = Math.abs(wMinus - wPlus) / 2;
+
+    hud.textContent = `t = ${tSec.toFixed(2)} s | x₁ = ${(x1 * 100).toFixed(1)} cm | x₂ = ${(x2 * 100).toFixed(1)} cm | ω+ = ${wPlus.toFixed(2)} | ω- = ${wMinus.toFixed(2)} | ω_beat = ${wBeat.toFixed(2)} rad/s`;
+
+    const w = plotCanvas.clientWidth || 560;
+    const h = 118;
+    if (plotCanvas.width !== w) {
+      plotCanvas.width = w;
+      plotCanvas.height = h;
+    }
+    const maxPts = Math.max(180, Math.floor(w / 2));
+    if (!paused) {
+      x1Trace.push(x1);
+      x2Trace.push(x2);
+      if (x1Trace.length > maxPts) x1Trace.shift();
+      if (x2Trace.length > maxPts) x2Trace.shift();
+    }
+
+    plotCtx.clearRect(0, 0, w, h);
+    plotCtx.strokeStyle = isDark ? '#38352f' : '#dcd8cf';
+    plotCtx.lineWidth = 1;
+    plotCtx.beginPath();
+    plotCtx.moveTo(0, h / 2);
+    plotCtx.lineTo(w, h / 2);
+    plotCtx.stroke();
+
+    const drawSeries = (arr: number[], color: string) => {
+      plotCtx.strokeStyle = color;
+      plotCtx.lineWidth = 1.7;
+      plotCtx.beginPath();
+      for (let i = 0; i < arr.length; i++) {
+        const px = (i / maxPts) * w;
+        const py = h / 2 - (arr[i] ?? 0) * 240;
+        if (i === 0) plotCtx.moveTo(px, py);
+        else plotCtx.lineTo(px, py);
+      }
+      plotCtx.stroke();
+    };
+
+    drawSeries(x1Trace, '#b91c1c');
+    drawSeries(x2Trace, isDark ? '#60a5fa' : '#1d4ed8');
+
+    renderer.render(scene, camera);
+    rafId = requestAnimationFrame(animate);
+  };
+
+  const onResize = () => {
+    if (!viewport.clientWidth) return;
+    camera.aspect = viewport.clientWidth / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(viewport.clientWidth, height);
+  };
+  window.addEventListener('resize', onResize);
+  rafId = requestAnimationFrame(animate);
+
+  return () => {
+    cancelAnimationFrame(rafId);
+    window.removeEventListener('resize', onResize);
+    controls.dispose();
     pmrem.dispose();
     renderer.dispose();
   };
